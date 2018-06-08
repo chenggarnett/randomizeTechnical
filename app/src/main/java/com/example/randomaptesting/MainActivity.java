@@ -4,6 +4,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -43,6 +44,10 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -73,19 +78,50 @@ public class MainActivity extends FragmentActivity implements OnConnectionFailed
 
         // Request a string response from the provided URL.
         StringRequest stringRequest = new StringRequest(Request.Method.GET, url,
-                new Response.Listener<String>() {
-                    @Override
-                    public void onResponse(String response) {
-                        // Display the first 500 characters of the response string.
-                        //mTextView.setText("Response is: "+ response.substring(0,5000));
-                        System.out.println(response.toString());
+            new Response.Listener<String>() {
+                @Override
+                public void onResponse(String response) {
+                    // Display the first 500 characters of the response string.
+                    //mTextView.setText("Response is: "+ response.substring(0,5000));
+                    //System.out.println(response.toString());
+
+                    try {
+                        JSONObject obj = new JSONObject(response);
+                        JSONArray results = obj.getJSONArray("results");
+
+                        ArrayList<String> listdata = new ArrayList<String>();
+                        JSONArray jArray = (JSONArray)results;
+                        if (jArray != null) {
+                            for (int i=0;i<jArray.length();i++){
+                                listdata.add(jArray.getString(i));
+                            }
+                        }
+
+                        for (String s: listdata) {
+                            //System.out.println(s.toString());
+                            int a = s.indexOf("vicinity");
+                            String s1 = s.substring(a + 11);
+                            s1 = s1.substring(0, s1.length() - 2);
+                            s1 = s1.replace(' ', '+');
+                            System.out.println(s1);
+                        }
+                    } catch (JSONException e) {
+                        e.printStackTrace();
                     }
-                }, new Response.ErrorListener() {
-            @Override
-            public void onErrorResponse(VolleyError error) {
-                mTextView.setText("That didn't work!");
+
+                }
+            }, new Response.ErrorListener() {
+                @Override
+                public void onErrorResponse(VolleyError error) {
+                    mTextView.setText("String request 1 didn't work!");
+                }
             }
-        });
+        );
+
+        Uri gmmIntentUri = Uri.parse("google.navigation:q=San+Jose+Airport,San+Jose,United+States");
+        Intent mapIntent = new Intent(Intent.ACTION_VIEW, gmmIntentUri);
+        mapIntent.setPackage("com.google.android.apps.maps");
+        startActivity(mapIntent);
 
         // Add the request to the RequestQueue.
         queue.add(stringRequest);
