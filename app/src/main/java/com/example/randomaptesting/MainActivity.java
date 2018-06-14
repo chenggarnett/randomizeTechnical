@@ -34,6 +34,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Random;
 
 /**
@@ -43,10 +44,7 @@ import java.util.Random;
 public class MainActivity extends FragmentActivity {
 
     private FusedLocationProviderClient mFusedLocationClient;
-    protected Location mLastLocation;
     private static final int LOC_REQ_CODE = 1;
-
-    protected ArrayList<String> placeIdList;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -68,16 +66,16 @@ public class MainActivity extends FragmentActivity {
                 @Override
                 public void onComplete(@NonNull Task<Location> task) {
                     if (task.isSuccessful() && task.getResult() != null) {
-                        mLastLocation = task.getResult();
+                        Location mLastLocation = task.getResult();
                         double latitude = mLastLocation.getLatitude();
                         double longitude = mLastLocation.getLongitude();
-//                        String result = "Last known Location Latitude is " +
-//                                mLastLocation.getLatitude() + "\n" +
-//                                "Last known longitude Longitude is " + mLastLocation.getLongitude();
-//                        System.out.println(result); // debug purpose
+                        System.out.println("Last known Location Latitude is " +
+                                mLastLocation.getLatitude()); // debugPrint purpose
+                        System.out.println("Last known Location Longitude is " +
+                                mLastLocation.getLongitude()); // debugPrint purpose
                         String[] userInput = returnUsersInputsForURL();
                         String completeUrl = constructUrl(latitude, longitude, "restaurant", userInput[0], userInput[1], userInput[2]);
-                        System.out.println(completeUrl); // debug purpose
+                        System.out.println(completeUrl); // debugPrint purpose
                         RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
                         StringRequest stringRequest = new StringRequest(Request.Method.GET, completeUrl,
                             new Response.Listener<String>() {
@@ -94,9 +92,9 @@ public class MainActivity extends FragmentActivity {
                                                 listData.add(jArray.getString(i));
                                             }
                                         }
-                                        placeIdList = getPlaceIdList(listData);
-                                        debug(listData);
-                                        getTheOne();
+                                        ArrayList<Destination> destinationList = jsonToJavaObj(listData);
+                                        debugPrint(destinationList); // for debug purpose
+//                                        getTheOne(placeIdList);
                                     } catch (JSONException e) {
                                         e.printStackTrace();
                                     }
@@ -116,15 +114,29 @@ public class MainActivity extends FragmentActivity {
             });
     }
 
-    private void debug(ArrayList<String> listData) {
-        ArrayList<String> addressList =  getNameList(listData);
-        ArrayList<String>  nameList = getAddressList(listData);
+    private ArrayList<Destination> jsonToJavaObj(ArrayList<String> listData) {
+        ArrayList<String>  nameList = getNameList(listData);
+        ArrayList<String> addressList =  getAddressList(listData);
+        ArrayList<String> placeIdList = getPlaceIdList(listData);
         ArrayList<Double> ratingList = getRatingList(listData);
-        for (int i = 0; i < nameList.size(); i++) { // debug purpose
-            System.out.println("Name: " + nameList.get(i) +
-                    " Rating: " + ratingList.get(i) + " Address: " + addressList.get(i));
+
+        HashSet<Destination> destinationList = new HashSet<>();
+
+        for (int i = 0; i < nameList.size(); i++) {
+            Destination d = new Destination(nameList.get(i), addressList.get(i),
+                    placeIdList.get(i), ratingList.get(i));
+            destinationList.add(d);
         }
-        System.out.println("Random number: " + randomize(placeIdList.size())); // debug purpose
+        return new ArrayList<>(destinationList);
+    }
+
+    private void debugPrint(ArrayList<Destination> destinationList) {
+        for (int i = 0; i < destinationList.size(); i++) { // debugPrint purpose
+            System.out.println(i+1 + ". " + "Name: " + destinationList.get(i).getName()
+                    + " Address: " + destinationList.get(i).getAddress()
+                    + " Rating: " + destinationList.get(i).getRating());
+        }
+        System.out.println("Random number: " + randomize(destinationList.size())); // debugPrint purpose
     }
 
     private String[] returnUsersInputsForURL() {
@@ -143,20 +155,21 @@ public class MainActivity extends FragmentActivity {
         return userInput;
     }
 
-    private void getTheOne() {
+    private void getTheOne(ArrayList<Destination> destinationList) {
         GeoDataClient mGeoDataClient = Places
                 .getGeoDataClient(getApplicationContext(), null);
-        mGeoDataClient.getPlaceById(placeIdList.get(randomize(placeIdList.size())))
+        mGeoDataClient.getPlaceById(destinationList
+                .get(randomize(destinationList.size())).getId())
                 .addOnCompleteListener(new OnCompleteListener<PlaceBufferResponse>() {
             @Override
             public void onComplete(@NonNull Task<PlaceBufferResponse> task) {
                 if (task.isSuccessful()) {
                     PlaceBufferResponse places = task.getResult();
                     Place myPlace = places.get(0);
-                    System.out.println("Place found: " + myPlace.getName()); // debug purpose
+                    System.out.println("Place found: " + myPlace.getName()); // debugPrint purpose
                     String editedAddress = myPlace.getAddress()
                             .toString().replace(' ', '+');
-                    goToDestination(editedAddress);
+//                    goToDestination(editedAddress);
                     places.release();
                 } else {
                     System.out.println("Place not found.");
@@ -188,8 +201,9 @@ public class MainActivity extends FragmentActivity {
 
     private ArrayList<String> getAddressList(ArrayList<String> listData) {
         ArrayList<String> addressList = new ArrayList<>();
+        int count = 1;
         for (String s: listData) {
-            System.out.println(s.toString()); // debug purpose
+            System.out.println(count + ". " + s.toString()); // debugPrint purpose
             if (s.toLowerCase().contains("price_level") && s.toLowerCase().contains("rating")){
                 int a = s.indexOf("vicinity");
                 int b = s.length();
@@ -197,6 +211,7 @@ public class MainActivity extends FragmentActivity {
                 s1 = s1.replace(' ', '+');
                 addressList.add(s1);
             }
+            count++;
         }
         return addressList;
     }
@@ -218,13 +233,13 @@ public class MainActivity extends FragmentActivity {
     private ArrayList<Double> getRatingList(ArrayList<String> listData) {
         ArrayList<Double> ratingList = new ArrayList<>();
         for (String s: listData) {
-            //System.out.println(s.toString()); // debug purpose
+            //System.out.println(s.toString()); // debugPrint purpose
             if (s.toLowerCase().contains("price_level") && s.toLowerCase().contains("rating")){
                 int a = s.indexOf("rating");
                 int b = s.indexOf("\"reference\"");
-                System.out.println("a:" + a + " b: " + b);
+//                System.out.println("a:" + a + " b: " + b); // debug purpose
                 String s1 = s.substring(a + 8, b - 1);
-                System.out.println(s1);
+//                System.out.println(s1); // debug purpose
                 double rating = Double.parseDouble(s1);
                 ratingList.add(rating);
             }
