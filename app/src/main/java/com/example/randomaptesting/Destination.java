@@ -1,6 +1,8 @@
 package com.example.randomaptesting;
 
-public class Destination {
+import java.io.Serializable;
+
+public class Destination implements Serializable{
 
     private String name;
     private String address;

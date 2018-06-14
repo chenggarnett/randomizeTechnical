@@ -96,7 +96,10 @@ public class MainActivity extends FragmentActivity {
                                         double rating = Double.parseDouble(ratingString);
                                         ArrayList<Destination> destinationList = jsonToJavaObj(listData, rating);
                                         debugPrint(destinationList); // for debug purpose
-                                        getTheOne(destinationList);
+                                        Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
+                                        showResultActivity.putExtra("DESTINATIONS", destinationList);
+                                        startActivity(showResultActivity);
+                                        //getTheOne(destinationList);
                                     } catch (JSONException e) {
                                         e.printStackTrace();
                                     }
@@ -139,7 +142,6 @@ public class MainActivity extends FragmentActivity {
             System.out.println(i+1 + ". " + "Address: " + destinationList.get(i).getAddress());
             System.out.println(i+1 + ". " + "Rating: " + destinationList.get(i).getRating());
         }
-        System.out.println("Random number: " + randomize(destinationList.size())); // debugPrint purpose
     }
 
     private String[] returnUsersInputsForURL() {
@@ -151,6 +153,8 @@ public class MainActivity extends FragmentActivity {
         String radiusString = radiusInput.getText().toString();
         double radius = Double.parseDouble(radiusString) * 1000;
         String maxPrice = priceInput.getText().toString();
+        int price = Integer.parseInt(maxPrice) - 1;
+        maxPrice = Integer.toString(price);
         radiusString  = Double.toString(radius);
         userInput[0] = radiusString;
         userInput[1] = keyword;
@@ -271,9 +275,9 @@ public class MainActivity extends FragmentActivity {
         return placeIdList;
     }
 
-    private int randomize(int placeIdListSize) {
+    private int randomize(int destinationListSize) {
         Random r = new Random();
-        int a = r.nextInt(placeIdListSize);
+        int a = r.nextInt(destinationListSize);
         return a;
     }
 
