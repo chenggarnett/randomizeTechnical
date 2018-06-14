@@ -84,7 +84,6 @@ public class MainActivity extends FragmentActivity {
                                     try {
                                         JSONObject obj = new JSONObject(response);
                                         JSONArray results = obj.getJSONArray("results");
-
                                         ArrayList<String> listData = new ArrayList<>();
                                         JSONArray jArray = results;
                                         if (jArray != null) {
@@ -92,9 +91,12 @@ public class MainActivity extends FragmentActivity {
                                                 listData.add(jArray.getString(i));
                                             }
                                         }
-                                        ArrayList<Destination> destinationList = jsonToJavaObj(listData);
+                                        EditText ratingInput = findViewById(R.id.ratingTxt);
+                                        String ratingString = ratingInput.getText().toString();
+                                        double rating = Double.parseDouble(ratingString);
+                                        ArrayList<Destination> destinationList = jsonToJavaObj(listData, rating);
                                         debugPrint(destinationList); // for debug purpose
-//                                        getTheOne(placeIdList);
+                                        getTheOne(destinationList);
                                     } catch (JSONException e) {
                                         e.printStackTrace();
                                     }
@@ -114,7 +116,7 @@ public class MainActivity extends FragmentActivity {
             });
     }
 
-    private ArrayList<Destination> jsonToJavaObj(ArrayList<String> listData) {
+    private ArrayList<Destination> jsonToJavaObj(ArrayList<String> listData, double userDesireRating) {
         ArrayList<String>  nameList = getNameList(listData);
         ArrayList<String> addressList =  getAddressList(listData);
         ArrayList<String> placeIdList = getPlaceIdList(listData);
@@ -125,16 +127,17 @@ public class MainActivity extends FragmentActivity {
         for (int i = 0; i < nameList.size(); i++) {
             Destination d = new Destination(nameList.get(i), addressList.get(i),
                     placeIdList.get(i), ratingList.get(i));
-            destinationList.add(d);
+            if (d.getRating() >= userDesireRating)
+                destinationList.add(d);
         }
         return new ArrayList<>(destinationList);
     }
 
     private void debugPrint(ArrayList<Destination> destinationList) {
         for (int i = 0; i < destinationList.size(); i++) { // debugPrint purpose
-            System.out.println(i+1 + ". " + "Name: " + destinationList.get(i).getName()
-                    + " Address: " + destinationList.get(i).getAddress()
-                    + " Rating: " + destinationList.get(i).getRating());
+            System.out.println(i+1 + ". " + "Name: " + destinationList.get(i).getName());
+            System.out.println(i+1 + ". " + "Address: " + destinationList.get(i).getAddress());
+            System.out.println(i+1 + ". " + "Rating: " + destinationList.get(i).getRating());
         }
         System.out.println("Random number: " + randomize(destinationList.size())); // debugPrint purpose
     }
@@ -146,9 +149,9 @@ public class MainActivity extends FragmentActivity {
         EditText priceInput = findViewById(R.id.priceTxt);
         String keyword = keyInput.getText().toString();
         String radiusString = radiusInput.getText().toString();
+        double radius = Double.parseDouble(radiusString) * 1000;
         String maxPrice = priceInput.getText().toString();
-        double tempRadius = Double.parseDouble(radiusString) * 1000;
-        radiusString  = Double.toString(tempRadius);
+        radiusString  = Double.toString(radius);
         userInput[0] = radiusString;
         userInput[1] = keyword;
         userInput[2] = maxPrice;
@@ -169,7 +172,7 @@ public class MainActivity extends FragmentActivity {
                     System.out.println("Place found: " + myPlace.getName()); // debugPrint purpose
                     String editedAddress = myPlace.getAddress()
                             .toString().replace(' ', '+');
-//                    goToDestination(editedAddress);
+                    goToDestination(editedAddress);
                     places.release();
                 } else {
                     System.out.println("Place not found.");
@@ -203,7 +206,7 @@ public class MainActivity extends FragmentActivity {
         ArrayList<String> addressList = new ArrayList<>();
         int count = 1;
         for (String s: listData) {
-            System.out.println(count + ". " + s.toString()); // debugPrint purpose
+//            System.out.println(count + ". " + s.toString()); // debugPrint purpose
             if (s.toLowerCase().contains("price_level") && s.toLowerCase().contains("rating")){
                 int a = s.indexOf("vicinity");
                 int b = s.length();
