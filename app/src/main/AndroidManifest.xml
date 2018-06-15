@@ -25,7 +25,6 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyDpKpQ2S8lvUK7xfHGgSoJXy0HG9tFU-7s" />
 
-        <activity android:name=".showResults" />
         <activity android:name=".ShowResult"></activity>
     </application>
 

@@ -13,6 +13,7 @@ import android.support.v4.content.ContextCompat;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Toast;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
@@ -49,14 +50,19 @@ public class MainActivity extends FragmentActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        Button submitButton = findViewById(R.id.submitBtn);
-        submitButton.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                // Code here executes on main thread after user presses button
-                mainFunc();
-            }
-        });
+        if (isLocationAccessPermitted()) {
+            mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+            Button submitButton = findViewById(R.id.submitBtn);
+            submitButton.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    // Code here executes on main thread after user presses button
+                    mainFunc();
+                }
+            });
+        } else {
+            Toast.makeText(this, "Location access is not permitted", Toast.LENGTH_LONG).show();
+        }
+
     }
 
     @SuppressWarnings("MissingPermission")
@@ -95,11 +101,9 @@ public class MainActivity extends FragmentActivity {
                                         String ratingString = ratingInput.getText().toString();
                                         double rating = Double.parseDouble(ratingString);
                                         ArrayList<Destination> destinationList = jsonToJavaObj(listData, rating);
-                                        debugPrint(destinationList); // for debug purpose
                                         Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
                                         showResultActivity.putExtra("DESTINATIONS", destinationList);
                                         startActivity(showResultActivity);
-                                        //getTheOne(destinationList);
                                     } catch (JSONException e) {
                                         e.printStackTrace();
                                     }
@@ -136,14 +140,6 @@ public class MainActivity extends FragmentActivity {
         return new ArrayList<>(destinationList);
     }
 
-    private void debugPrint(ArrayList<Destination> destinationList) {
-        for (int i = 0; i < destinationList.size(); i++) { // debugPrint purpose
-            System.out.println(i+1 + ". " + "Name: " + destinationList.get(i).getName());
-            System.out.println(i+1 + ". " + "Address: " + destinationList.get(i).getAddress());
-            System.out.println(i+1 + ". " + "Rating: " + destinationList.get(i).getRating());
-        }
-    }
-
     private String[] returnUsersInputsForURL() {
         String[] userInput = new String[3];
         EditText keyInput = findViewById(R.id.keyTxt);
@@ -153,43 +149,11 @@ public class MainActivity extends FragmentActivity {
         String radiusString = radiusInput.getText().toString();
         double radius = Double.parseDouble(radiusString) * 1000;
         String maxPrice = priceInput.getText().toString();
-        int price = Integer.parseInt(maxPrice) - 1;
-        maxPrice = Integer.toString(price);
         radiusString  = Double.toString(radius);
         userInput[0] = radiusString;
         userInput[1] = keyword;
         userInput[2] = maxPrice;
         return userInput;
-    }
-
-    private void getTheOne(ArrayList<Destination> destinationList) {
-        GeoDataClient mGeoDataClient = Places
-                .getGeoDataClient(getApplicationContext(), null);
-        mGeoDataClient.getPlaceById(destinationList
-                .get(randomize(destinationList.size())).getId())
-                .addOnCompleteListener(new OnCompleteListener<PlaceBufferResponse>() {
-            @Override
-            public void onComplete(@NonNull Task<PlaceBufferResponse> task) {
-                if (task.isSuccessful()) {
-                    PlaceBufferResponse places = task.getResult();
-                    Place myPlace = places.get(0);
-                    System.out.println("Place found: " + myPlace.getName()); // debugPrint purpose
-                    String editedAddress = myPlace.getAddress()
-                            .toString().replace(' ', '+');
-                    goToDestination(editedAddress);
-                    places.release();
-                } else {
-                    System.out.println("Place not found.");
-                }
-            }
-        });
-    }
-
-    private void goToDestination(String editedAddress) {
-        Uri gmmIntentUri = Uri.parse("google.navigation:q=" + editedAddress);
-        Intent mapIntent = new Intent(Intent.ACTION_VIEW, gmmIntentUri);
-        mapIntent.setPackage("com.google.android.apps.maps");
-        startActivity(mapIntent);
     }
 
     private String constructUrl(double latitude, double longitude,
@@ -273,12 +237,6 @@ public class MainActivity extends FragmentActivity {
             }
         }
         return placeIdList;
-    }
-
-    private int randomize(int destinationListSize) {
-        Random r = new Random();
-        int a = r.nextInt(destinationListSize);
-        return a;
     }
 
     private boolean isLocationAccessPermitted() {
