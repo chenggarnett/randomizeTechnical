@@ -4,7 +4,6 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
-import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -23,10 +22,6 @@ import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.places.GeoDataClient;
-import com.google.android.gms.location.places.Place;
-import com.google.android.gms.location.places.PlaceBufferResponse;
-import com.google.android.gms.location.places.Places;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
@@ -36,7 +31,6 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Random;
 
 /**
  * Created by chengchinlim on 5/29/18.
@@ -46,17 +40,23 @@ public class MainActivity extends FragmentActivity {
 
     private FusedLocationProviderClient mFusedLocationClient;
     private static final int LOC_REQ_CODE = 1;
+    private String[] userInput = new String[3];
+    EditText radiusInput;
+    EditText keyInput;
+    EditText priceInput;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        final Intent mainActivityIntent = getIntent();
+
         if (isLocationAccessPermitted()) {
             mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
             Button submitButton = findViewById(R.id.submitBtn);
             submitButton.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
                     // Code here executes on main thread after user presses button
-                    mainFunc();
+                    mainFunc(mainActivityIntent);
                 }
             });
         } else {
@@ -66,7 +66,7 @@ public class MainActivity extends FragmentActivity {
     }
 
     @SuppressWarnings("MissingPermission")
-    private void mainFunc() {
+    private void mainFunc(final Intent mainActivityIntent) {
         mFusedLocationClient.getLastLocation()
             .addOnCompleteListener(this, new OnCompleteListener<Location>() {
                 @Override
@@ -79,8 +79,13 @@ public class MainActivity extends FragmentActivity {
                                 mLastLocation.getLatitude()); // debugPrint purpose
                         System.out.println("Last known Location Longitude is " +
                                 mLastLocation.getLongitude()); // debugPrint purpose
-                        String[] userInput = returnUsersInputsForURL();
-                        String completeUrl = constructUrl(latitude, longitude, "restaurant", userInput[0], userInput[1], userInput[2]);
+                        returnUsersInputsForURL();
+                        if (Double.parseDouble(userInput[0]) < 1000 || Double.parseDouble(userInput[0]) > 50000) {
+                            radiusInput.setText("");
+                            Toast.makeText(getApplicationContext(), "Radius range: 1-50", Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        String completeUrl = constructNearbySearchUrl(latitude, longitude, "restaurant", userInput[0], userInput[1], userInput[2]);
                         System.out.println(completeUrl); // debugPrint purpose
                         RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
                         StringRequest stringRequest = new StringRequest(Request.Method.GET, completeUrl,
@@ -100,6 +105,11 @@ public class MainActivity extends FragmentActivity {
                                         EditText ratingInput = findViewById(R.id.ratingTxt);
                                         String ratingString = ratingInput.getText().toString();
                                         double rating = Double.parseDouble(ratingString);
+                                        if (rating < 0 || rating > 5) {
+                                            ratingInput.setText("");
+                                            Toast.makeText(getApplicationContext(), "Rating range: 1-5", Toast.LENGTH_LONG).show();
+                                            return;
+                                        }
                                         ArrayList<Destination> destinationList = jsonToJavaObj(listData, rating);
                                         Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
                                         showResultActivity.putExtra("DESTINATIONS", destinationList);
@@ -128,36 +138,35 @@ public class MainActivity extends FragmentActivity {
         ArrayList<String> addressList =  getAddressList(listData);
         ArrayList<String> placeIdList = getPlaceIdList(listData);
         ArrayList<Double> ratingList = getRatingList(listData);
+        ArrayList<String> photoRefList = getPhotoRefList(listData);
 
         HashSet<Destination> destinationList = new HashSet<>();
 
         for (int i = 0; i < nameList.size(); i++) {
             Destination d = new Destination(nameList.get(i), addressList.get(i),
-                    placeIdList.get(i), ratingList.get(i));
+                    placeIdList.get(i), ratingList.get(i), photoRefList.get(i));
             if (d.getRating() >= userDesireRating)
                 destinationList.add(d);
         }
         return new ArrayList<>(destinationList);
     }
 
-    private String[] returnUsersInputsForURL() {
-        String[] userInput = new String[3];
-        EditText keyInput = findViewById(R.id.keyTxt);
-        EditText radiusInput = findViewById(R.id.radiusTxt);
-        EditText priceInput = findViewById(R.id.priceTxt);
-        String keyword = keyInput.getText().toString();
+    private void returnUsersInputsForURL() {
+        radiusInput = findViewById(R.id.radiusTxt);
+        keyInput = findViewById(R.id.keyTxt);
+        priceInput = findViewById(R.id.priceTxt);
         String radiusString = radiusInput.getText().toString();
         double radius = Double.parseDouble(radiusString) * 1000;
-        String maxPrice = priceInput.getText().toString();
         radiusString  = Double.toString(radius);
+        String keyword = keyInput.getText().toString();
+        String maxPrice = priceInput.getText().toString();
         userInput[0] = radiusString;
         userInput[1] = keyword;
         userInput[2] = maxPrice;
-        return userInput;
     }
 
-    private String constructUrl(double latitude, double longitude,
-                                String type, String radius, String key, String maxPrice) {
+    private String constructNearbySearchUrl(double latitude, double longitude,
+                                            String type, String radius, String key, String maxPrice) {
         String basicUrl ="https://maps.googleapis.com/maps/api/place/nearbysearch/json?";
         String latAndLong = "location=" + Double.toString(latitude) + "," + Double.toString(longitude);
         String radiusFrCurrentLocation = "&radius=" + radius;
@@ -170,11 +179,28 @@ public class MainActivity extends FragmentActivity {
         return completeUrl;
     }
 
+    private ArrayList<String> getPhotoRefList(ArrayList<String> listData) {
+        ArrayList<String> photoRefList = new ArrayList<>();
+        int count = 1;
+        for (String s: listData) {
+            if (s.toLowerCase().contains("price_level") && s.toLowerCase().contains("rating")){
+                int a = s.indexOf("photo_reference");
+                int b = s.indexOf("width");
+                String s1 = s.substring(a + 18, b - 3);
+                s1 = s1.replace(' ', '+');
+                System.out.println(count + ". " + s1); // debugPrint purpose
+                photoRefList.add(s1);
+            }
+            count++;
+        }
+        return photoRefList;
+    }
+
     private ArrayList<String> getAddressList(ArrayList<String> listData) {
         ArrayList<String> addressList = new ArrayList<>();
         int count = 1;
         for (String s: listData) {
-//            System.out.println(count + ". " + s.toString()); // debugPrint purpose
+            System.out.println(count + ". " + s.toString()); // debugPrint purpose
             if (s.toLowerCase().contains("price_level") && s.toLowerCase().contains("rating")){
                 int a = s.indexOf("vicinity");
                 int b = s.length();
@@ -204,7 +230,6 @@ public class MainActivity extends FragmentActivity {
     private ArrayList<Double> getRatingList(ArrayList<String> listData) {
         ArrayList<Double> ratingList = new ArrayList<>();
         for (String s: listData) {
-            //System.out.println(s.toString()); // debugPrint purpose
             if (s.toLowerCase().contains("price_level") && s.toLowerCase().contains("rating")){
                 int a = s.indexOf("rating");
                 int b = s.indexOf("\"reference\"");

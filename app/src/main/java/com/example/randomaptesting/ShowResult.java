@@ -1,14 +1,24 @@
 package com.example.randomaptesting;
 
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.google.android.gms.location.places.GeoDataClient;
 import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.PlaceBufferResponse;
@@ -16,8 +26,16 @@ import com.google.android.gms.location.places.Places;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.w3c.dom.Text;
 
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Random;
 
@@ -55,6 +73,26 @@ public class ShowResult extends AppCompatActivity {
                             System.out.println("Place found: " + myPlace.getName()); // debugPrint purpose
                             editedAddress = myPlace.getAddress()
                                     .toString().replace(' ', '+');
+                            final String photoUrl = constructPhotoUrl(destinationList.get(randNo));
+                            System.out.println(photoUrl);
+                            RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
+                            StringRequest stringRequest = new StringRequest(Request.Method.GET, photoUrl,
+                                    new Response.Listener<String>() {
+                                        @Override
+                                        public void onResponse(String response) {
+                                            ImageView showPhoto = findViewById(R.id.showPhoto);
+                                            new GetBitmap().execute(photoUrl);
+//                                            System.out.println("Succeed! Response is " + response); // for debug purpose
+                                        }
+                                    }, new Response.ErrorListener() {
+                                @Override
+                                public void onErrorResponse(VolleyError error) {
+                                    System.out.println("Volley Error");
+                                }
+                            }
+                            );
+                            queue.add(stringRequest);
+
                             showTextViews(myPlace); // for debug purpose
                             places.release();
                         } else {
@@ -63,6 +101,15 @@ public class ShowResult extends AppCompatActivity {
                     }
                 });
     }
+
+    private String constructPhotoUrl(Destination d) {
+        String basicUrl = "https://maps.googleapis.com/maps/api/place/photo?";
+        String photoRef = "photoreference=" + d.getPhotoRef();
+        String heightWidth = "&maxheight=200&maxwidth=320&key=AIzaSyDpKpQ2S8lvUK7xfHGgSoJXy0HG9tFU-7s";
+        String completeUrl = basicUrl + photoRef + heightWidth;
+        return completeUrl;
+    }
+
 
     private void showTextViews(Place myPlace) { // for debug purpose
         TextView showName = findViewById(R.id.showNameTxt);
