@@ -182,14 +182,17 @@ public class MainActivity extends FragmentActivity {
     private ArrayList<String> getPhotoRefList(ArrayList<String> listData) {
         ArrayList<String> photoRefList = new ArrayList<>();
         int count = 1;
+        String basicUrl = "https://maps.googleapis.com/maps/api/place/photo?";
+        String heightWidth = "&maxheight=200&maxwidth=320&key=AIzaSyDpKpQ2S8lvUK7xfHGgSoJXy0HG9tFU-7s";
         for (String s: listData) {
             if (s.toLowerCase().contains("price_level") && s.toLowerCase().contains("rating")){
                 int a = s.indexOf("photo_reference");
                 int b = s.indexOf("width");
                 String s1 = s.substring(a + 18, b - 3);
                 s1 = s1.replace(' ', '+');
-                System.out.println(count + ". " + s1); // debugPrint purpose
-                photoRefList.add(s1);
+                String completeUrl = basicUrl + "photreference=" + s1 + heightWidth;
+                photoRefList.add(completeUrl);
+                System.out.println(count + ". " + completeUrl); // debugPrint purpose
             }
             count++;
         }

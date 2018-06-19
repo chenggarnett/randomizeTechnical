@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -42,15 +43,23 @@ import java.util.Random;
 public class ShowResult extends AppCompatActivity {
 
     private String editedAddress;
+    private String placeUrl;
     private ArrayList<Destination> destinationList;
     private int randNo;
+    TextView showName;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_show_result);
+        showName = findViewById(R.id.showNameTxt);
         destinationList = (ArrayList<Destination>)getIntent().getSerializableExtra("DESTINATIONS");
         getTheOne(destinationList);
+        String[] photoUrls = new String[destinationList.size()];
+        for (int i = 0; i < destinationList.size(); i++) {
+            photoUrls[i] = destinationList.get(i).getPhotoRef();
+        }
+//        new GetBitmap().execute(photoUrls);
     }
 
     private void getTheOne(final ArrayList<Destination> destinationList) {
@@ -73,28 +82,17 @@ public class ShowResult extends AppCompatActivity {
                             System.out.println("Place found: " + myPlace.getName()); // debugPrint purpose
                             editedAddress = myPlace.getAddress()
                                     .toString().replace(' ', '+');
-                            final String photoUrl = constructPhotoUrl(destinationList.get(randNo));
-                            System.out.println(photoUrl);
-                            RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
-                            StringRequest stringRequest = new StringRequest(Request.Method.GET, photoUrl,
-                                    new Response.Listener<String>() {
-                                        @Override
-                                        public void onResponse(String response) {
-                                            ImageView showPhoto = findViewById(R.id.showPhoto);
-                                            new GetBitmap().execute(photoUrl);
-//                                            System.out.println("Succeed! Response is " + response); // for debug purpose
-                                        }
-                                    }, new Response.ErrorListener() {
-                                @Override
-                                public void onErrorResponse(VolleyError error) {
-                                    System.out.println("Volley Error");
-                                }
+                            showName.setClickable(false);
+                            if (myPlace.getWebsiteUri() != null) {
+                                placeUrl = myPlace.getWebsiteUri().toString();
+//                                System.out.println("Place URL is " + placeUrl); // for debug purpose
+                                showName.setClickable(true);
+                            } else {
+                                Toast.makeText(getApplicationContext(), "No website for this place", Toast.LENGTH_SHORT).show();
                             }
-                            );
-                            queue.add(stringRequest);
-
                             showTextViews(myPlace); // for debug purpose
                             places.release();
+
                         } else {
                             System.out.println("Place not found.");
                         }
@@ -102,22 +100,12 @@ public class ShowResult extends AppCompatActivity {
                 });
     }
 
-    private String constructPhotoUrl(Destination d) {
-        String basicUrl = "https://maps.googleapis.com/maps/api/place/photo?";
-        String photoRef = "photoreference=" + d.getPhotoRef();
-        String heightWidth = "&maxheight=200&maxwidth=320&key=AIzaSyDpKpQ2S8lvUK7xfHGgSoJXy0HG9tFU-7s";
-        String completeUrl = basicUrl + photoRef + heightWidth;
-        return completeUrl;
-    }
-
-
     private void showTextViews(Place myPlace) { // for debug purpose
-        TextView showName = findViewById(R.id.showNameTxt);
         TextView showAddress = findViewById(R.id.showAddressTxt);
         TextView showNoOfResults = findViewById(R.id.showNoOfResultsTxt);
         TextView showRating = findViewById(R.id.showRatingTxt);
-        showName.setText("Restaurant name: " + myPlace.getName());
-        showAddress.setText("Address: " + myPlace.getAddress());
+        showName.setText(myPlace.getName());
+        showAddress.setText(myPlace.getAddress());
         showRating.setText("Rating: " + myPlace.getRating());
         showNoOfResults.setText("No of results: " + destinationList.size());
     }
@@ -137,6 +125,23 @@ public class ShowResult extends AppCompatActivity {
         System.out.println("Inside onHomeClicked function"); // for debug purpose
         Intent mainActivity =  new Intent(ShowResult.this, MainActivity.class);
         startActivity(mainActivity);
+    }
+    public void onNameClicked(View v) {
+        System.out.println("Inside onNameClicked function"); // for debug purpose
+        Uri uri = Uri.parse(placeUrl);
+        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+        startActivity(intent);
+    }
+
+    public void onAddressClicked(View v) {
+        String basicUrl = "https://www.google.com/search?biw=1440&bih=803&tbm=isch&sa=1&ei=YHwoW4igCueO0gKS57r4Bg&q=";
+        String placeName = destinationList.get(randNo).getName();
+        String placeAddress = destinationList.get(randNo).getAddress();
+        placeName = placeName.replace(' ', '+');
+        String completeUrl = basicUrl + placeName + "+restaurant+" + placeAddress;
+        Uri uri = Uri.parse(completeUrl);
+        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+        startActivity(intent);
     }
 
     private void goToDestination(String editedAddress) {
@@ -159,4 +164,32 @@ public class ShowResult extends AppCompatActivity {
             System.out.println(i+1 + ". " + "Rating: " + destinationList.get(i).getRating());
         }
     }
+
+//    private class GetBitmap extends AsyncTask<String, Void, Bitmap[]> {
+//
+//        @Override
+//        protected Bitmap[] doInBackground(String[] urls) {
+//            Bitmap[] bm = null;
+//            try {
+//                URL aURL = new URL(urls[0]);
+//                System.out.println("URL is " + aURL);
+//                URLConnection conn = aURL.openConnection();
+//                conn.connect();
+//                InputStream is = conn.getInputStream();
+//                BufferedInputStream bis = new BufferedInputStream(is);
+//                bm[0] = BitmapFactory.decodeStream(bis);
+//                bis.close();
+//                is.close();
+//                return bm;
+//            } catch (IOException e) {
+//                System.out.println("Error getting bitmap");
+//            }
+//            return null;
+//        }
+//        @Override
+//        protected void onPostExecute(Bitmap bm[]) {
+//            ImageView showPhoto = findViewById(R.id.showPhoto);
+//            showPhoto.setImageBitmap(bm[0]);
+//        }
+//    }
 }
