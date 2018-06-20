@@ -42,7 +42,7 @@ public class MainActivity extends FragmentActivity {
     private static final int LOC_REQ_CODE = 1;
     private String[] userInput = new String[3];
     EditText radiusInput;
-    EditText keyInput;
+    EditText keywordInput;
     EditText priceInput;
 
     protected void onCreate(Bundle savedInstanceState) {
@@ -153,12 +153,13 @@ public class MainActivity extends FragmentActivity {
 
     private void returnUsersInputsForURL() {
         radiusInput = findViewById(R.id.radiusTxt);
-        keyInput = findViewById(R.id.keyTxt);
+        keywordInput = findViewById(R.id.keyTxt);
         priceInput = findViewById(R.id.priceTxt);
         String radiusString = radiusInput.getText().toString();
         double radius = Double.parseDouble(radiusString) * 1000;
         radiusString  = Double.toString(radius);
-        String keyword = keyInput.getText().toString();
+        String keyword = keywordInput.getText().toString();
+        keyword = keyword.replace(' ', '+');
         String maxPrice = priceInput.getText().toString();
         userInput[0] = radiusString;
         userInput[1] = keyword;

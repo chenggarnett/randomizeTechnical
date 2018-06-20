@@ -59,7 +59,6 @@ public class ShowResult extends AppCompatActivity {
         for (int i = 0; i < destinationList.size(); i++) {
             photoUrls[i] = destinationList.get(i).getPhotoRef();
         }
-//        new GetBitmap().execute(photoUrls);
     }
 
     private void getTheOne(final ArrayList<Destination> destinationList) {
@@ -164,32 +163,4 @@ public class ShowResult extends AppCompatActivity {
             System.out.println(i+1 + ". " + "Rating: " + destinationList.get(i).getRating());
         }
     }
-
-//    private class GetBitmap extends AsyncTask<String, Void, Bitmap[]> {
-//
-//        @Override
-//        protected Bitmap[] doInBackground(String[] urls) {
-//            Bitmap[] bm = null;
-//            try {
-//                URL aURL = new URL(urls[0]);
-//                System.out.println("URL is " + aURL);
-//                URLConnection conn = aURL.openConnection();
-//                conn.connect();
-//                InputStream is = conn.getInputStream();
-//                BufferedInputStream bis = new BufferedInputStream(is);
-//                bm[0] = BitmapFactory.decodeStream(bis);
-//                bis.close();
-//                is.close();
-//                return bm;
-//            } catch (IOException e) {
-//                System.out.println("Error getting bitmap");
-//            }
-//            return null;
-//        }
-//        @Override
-//        protected void onPostExecute(Bitmap bm[]) {
-//            ImageView showPhoto = findViewById(R.id.showPhoto);
-//            showPhoto.setImageBitmap(bm[0]);
-//        }
-//    }
 }

@@ -29,7 +29,7 @@
         android:layout_marginStart="8dp"
         android:layout_marginTop="48dp"
         android:ems="10"
-        android:hint="key"
+        android:hint="keyword"
         android:inputType="textPersonName"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
