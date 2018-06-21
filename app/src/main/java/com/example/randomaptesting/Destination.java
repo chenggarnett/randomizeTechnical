@@ -8,14 +8,12 @@ public class Destination implements Serializable{
     private String address;
     private String id;
     private double rating;
-    private String photoRef;
 
-    public Destination(String n, String a , String i,  double r, String p) {
+    public Destination(String n, String a , String i,  double r) {
         name = n;
         address = a;
         id = i;
         rating = r;
-        photoRef = p;
     }
 
     public String getName() {
@@ -33,8 +31,6 @@ public class Destination implements Serializable{
     public double getRating() {
         return rating;
     }
-
-    public String getPhotoRef() { return  photoRef; }
 
     public boolean equals(Object x) {
         Destination d = (Destination)x;
@@ -55,5 +51,13 @@ public class Destination implements Serializable{
         }
 //        System.out.println("Name:" + name + " Sum: " + sum); // debug purpose
         return sum;
+    }
+
+    @Override
+    public String toString() {
+        return "Name: " + name + "\n"
+                + "Address: " + address + "\n"
+                + "Place ID: " + id + "\n"
+                + "Rating: " + rating;
     }
 }

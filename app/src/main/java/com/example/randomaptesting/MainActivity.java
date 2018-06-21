@@ -10,6 +10,8 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.ContextCompat;
 import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
@@ -29,6 +31,10 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashSet;
 
@@ -42,31 +48,32 @@ public class MainActivity extends FragmentActivity {
     private static final int LOC_REQ_CODE = 1;
     private String[] userInput = new String[3];
     EditText radiusInput;
-    EditText keywordInput;
     EditText priceInput;
+    AutoCompleteTextView keyWordInput;
+
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        final Intent mainActivityIntent = getIntent();
-
+        keyWordInput = findViewById(R.id.searchKeyTxt);
+        ArrayList<String> keywords = getKeywordsForAutocomplete();
+//        for (String keyword: keywords) { // for debug purpose
+//            System.out.println("Keyword: " +keyword);
+//        }
+        ArrayAdapter adapter = new
+                ArrayAdapter(this,android.R.layout.simple_list_item_1, keywords);
+        keyWordInput.setAdapter(adapter);
+        keyWordInput.setThreshold(1);
         if (isLocationAccessPermitted()) {
             mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-            Button submitButton = findViewById(R.id.submitBtn);
-            submitButton.setOnClickListener(new View.OnClickListener() {
-                public void onClick(View v) {
-                    // Code here executes on main thread after user presses button
-                    mainFunc(mainActivityIntent);
-                }
-            });
         } else {
-            Toast.makeText(this, "Location access is not permitted", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Please enable your location service", Toast.LENGTH_LONG).show();
         }
 
     }
 
     @SuppressWarnings("MissingPermission")
-    private void mainFunc(final Intent mainActivityIntent) {
+    private void mainFunc() {
         mFusedLocationClient.getLastLocation()
             .addOnCompleteListener(this, new OnCompleteListener<Location>() {
                 @Override
@@ -95,24 +102,31 @@ public class MainActivity extends FragmentActivity {
                                     try {
                                         JSONObject obj = new JSONObject(response);
                                         JSONArray results = obj.getJSONArray("results");
-                                        ArrayList<String> listData = new ArrayList<>();
-                                        JSONArray jArray = results;
-                                        if (jArray != null) {
-                                            for (int i=0;i<jArray.length();i++){
-                                                listData.add(jArray.getString(i));
-                                            }
-                                        }
                                         EditText ratingInput = findViewById(R.id.ratingTxt);
                                         String ratingString = ratingInput.getText().toString();
-                                        double rating = Double.parseDouble(ratingString);
-                                        if (rating < 0 || rating > 5) {
+                                        double userRating = Double.parseDouble(ratingString);
+                                        if (userRating < 0 || userRating > 5) {
                                             ratingInput.setText("");
                                             Toast.makeText(getApplicationContext(), "Rating range: 1-5", Toast.LENGTH_LONG).show();
                                             return;
                                         }
-                                        ArrayList<Destination> destinationList = jsonToJavaObj(listData, rating);
+                                        HashSet<Destination> destinationList = new HashSet<>();
+                                        for (int i = 0; i < results.length(); i++) {
+                                            String name = results.getJSONObject(i).getString("name");
+                                            String address = results.getJSONObject(i).getString("vicinity");
+                                            String placeId = results.getJSONObject(i).getString("place_id");
+                                            String ratingStr = results.getJSONObject(i).getString("rating");
+                                            double rating = Double.parseDouble(ratingStr);
+                                            Destination d = new Destination(name, address, placeId, rating);
+                                            if (rating >= userRating)
+                                                destinationList.add(d);
+                                        }
+//                                        for (Destination d: destinationList) { // for debug purpose
+//                                            System.out.println(d);
+//                                        }
+                                        ArrayList<Destination> destinations = new ArrayList<>(destinationList);
                                         Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
-                                        showResultActivity.putExtra("DESTINATIONS", destinationList);
+                                        showResultActivity.putExtra("DESTINATIONS", destinations);
                                         startActivity(showResultActivity);
                                     } catch (JSONException e) {
                                         e.printStackTrace();
@@ -133,37 +147,41 @@ public class MainActivity extends FragmentActivity {
             });
     }
 
-    private ArrayList<Destination> jsonToJavaObj(ArrayList<String> listData, double userDesireRating) {
-        ArrayList<String>  nameList = getNameList(listData);
-        ArrayList<String> addressList =  getAddressList(listData);
-        ArrayList<String> placeIdList = getPlaceIdList(listData);
-        ArrayList<Double> ratingList = getRatingList(listData);
-        ArrayList<String> photoRefList = getPhotoRefList(listData);
-
-        HashSet<Destination> destinationList = new HashSet<>();
-
-        for (int i = 0; i < nameList.size(); i++) {
-            Destination d = new Destination(nameList.get(i), addressList.get(i),
-                    placeIdList.get(i), ratingList.get(i), photoRefList.get(i));
-            if (d.getRating() >= userDesireRating)
-                destinationList.add(d);
-        }
-        return new ArrayList<>(destinationList);
+    public void onSubmitClicked(View v) {
+        mainFunc();
     }
 
     private void returnUsersInputsForURL() {
         radiusInput = findViewById(R.id.radiusTxt);
-        keywordInput = findViewById(R.id.keyTxt);
         priceInput = findViewById(R.id.priceTxt);
+
+        String keyword = keyWordInput.getText().toString();
         String radiusString = radiusInput.getText().toString();
         double radius = Double.parseDouble(radiusString) * 1000;
         radiusString  = Double.toString(radius);
-        String keyword = keywordInput.getText().toString();
         keyword = keyword.replace(' ', '+');
         String maxPrice = priceInput.getText().toString();
         userInput[0] = radiusString;
         userInput[1] = keyword;
         userInput[2] = maxPrice;
+    }
+
+    private ArrayList<String> getKeywordsForAutocomplete() {
+        System.out.println("Inside getKeywordsForAutoComplete function"); // for debug purpose
+        ArrayList<String> keywords = new ArrayList<>();
+        InputStream is = getResources().openRawResource(R.raw.keywords);
+        try {
+            BufferedReader br = new BufferedReader(new InputStreamReader(is));
+            String line;
+            while ((line = br.readLine()) != null) {
+                keywords.add(line);
+            }
+            br.close();
+        }
+        catch (IOException e) {
+            System.out.println("Failed to load keywords from text file");
+        }
+        return keywords;
     }
 
     private String constructNearbySearchUrl(double latitude, double longitude,
@@ -178,94 +196,6 @@ public class MainActivity extends FragmentActivity {
         String completeUrl = basicUrl + latAndLong + radiusFrCurrentLocation
                 + placeType + keyword + maxP + apiKey;
         return completeUrl;
-    }
-
-    private ArrayList<String> getPhotoRefList(ArrayList<String> listData) {
-        ArrayList<String> photoRefList = new ArrayList<>();
-        int count = 1;
-        String basicUrl = "https://maps.googleapis.com/maps/api/place/photo?";
-        String heightWidth = "&maxheight=200&maxwidth=320&key=AIzaSyDpKpQ2S8lvUK7xfHGgSoJXy0HG9tFU-7s";
-        for (String s: listData) {
-            if (s.toLowerCase().contains("price_level") && s.toLowerCase().contains("rating")){
-                int a = s.indexOf("photo_reference");
-                int b = s.indexOf("width");
-                String s1 = s.substring(a + 18, b - 3);
-                s1 = s1.replace(' ', '+');
-                String completeUrl = basicUrl + "photreference=" + s1 + heightWidth;
-                photoRefList.add(completeUrl);
-                System.out.println(count + ". " + completeUrl); // debugPrint purpose
-            }
-            count++;
-        }
-        return photoRefList;
-    }
-
-    private ArrayList<String> getAddressList(ArrayList<String> listData) {
-        ArrayList<String> addressList = new ArrayList<>();
-        int count = 1;
-        for (String s: listData) {
-            System.out.println(count + ". " + s.toString()); // debugPrint purpose
-            if (s.toLowerCase().contains("price_level") && s.toLowerCase().contains("rating")){
-                int a = s.indexOf("vicinity");
-                int b = s.length();
-                String s1 = s.substring(a + 11, b - 2);
-                s1 = s1.replace(' ', '+');
-                addressList.add(s1);
-            }
-            count++;
-        }
-        return addressList;
-    }
-
-    private ArrayList<String> getNameList(ArrayList<String> listData) {
-        ArrayList<String> nameList = new ArrayList<>();
-        for (String s: listData) {
-            if (s.toLowerCase().contains("price_level") && s.toLowerCase().contains("rating")) {
-                int a = s.indexOf("name");
-                int b = s.indexOf("opening");
-                String s2 = s.substring(a + 7, b - 3);
-                s2 = s2.replace(' ', '+');
-                nameList.add(s2);
-            }
-        }
-        return nameList;
-    }
-
-    private ArrayList<Double> getRatingList(ArrayList<String> listData) {
-        ArrayList<Double> ratingList = new ArrayList<>();
-        for (String s: listData) {
-            if (s.toLowerCase().contains("price_level") && s.toLowerCase().contains("rating")){
-                int a = s.indexOf("rating");
-                int b = s.indexOf("\"reference\"");
-//                System.out.println("a:" + a + " b: " + b); // debug purpose
-                String s1 = s.substring(a + 8, b - 1);
-//                System.out.println(s1); // debug purpose
-                double rating = Double.parseDouble(s1);
-                ratingList.add(rating);
-            }
-        }
-        return ratingList;
-    }
-
-    private ArrayList<String> getPlaceIdList(ArrayList<String> listData) {
-        ArrayList<String> placeIdList = new ArrayList<>();
-        for (String s: listData) {
-            int a = s.indexOf("place_id");
-            int b = 0;
-            String placeId = "";
-            if (s.toLowerCase().contains("price_level")) {
-                b = s.indexOf("price_level");
-                placeId = s.substring(a + 11, b - 3);
-                placeIdList.add(placeId);
-            } else if (s.toLowerCase().contains("rating")) {
-                b = s.indexOf("rating");
-                placeId = s.substring(a + 11, b - 3);
-                placeIdList.add(placeId);
-            } else {
-                System.out.println("fml no rating nor price level");
-            }
-        }
-        return placeIdList;
     }
 
     private boolean isLocationAccessPermitted() {

@@ -55,10 +55,6 @@ public class ShowResult extends AppCompatActivity {
         showName = findViewById(R.id.showNameTxt);
         destinationList = (ArrayList<Destination>)getIntent().getSerializableExtra("DESTINATIONS");
         getTheOne(destinationList);
-        String[] photoUrls = new String[destinationList.size()];
-        for (int i = 0; i < destinationList.size(); i++) {
-            photoUrls[i] = destinationList.get(i).getPhotoRef();
-        }
     }
 
     private void getTheOne(final ArrayList<Destination> destinationList) {
@@ -79,6 +75,33 @@ public class ShowResult extends AppCompatActivity {
                             PlaceBufferResponse places = task.getResult();
                             Place myPlace = places.get(0);
                             System.out.println("Place found: " + myPlace.getName()); // debugPrint purpose
+                            String completeUrl = constructReviewUrl();
+                            System.out.println(completeUrl); // for debug purpose
+                            RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
+                            StringRequest stringRequest = new StringRequest(Request.Method.GET, completeUrl,
+                                new Response.Listener<String>() {
+                                    @Override
+                                    public void onResponse(String response) {
+                                        try {
+                                            JSONObject obj = new JSONObject(response);
+                                            JSONArray reviews = obj.getJSONObject("result").getJSONArray("reviews");
+                                            if (reviews != null) {
+//                                                for (int i = 0; i < reviews.length(); i++) { // for debug purpose
+//                                                    System.out.println(reviews.get(i));
+//                                                }
+                                            }
+                                        } catch (JSONException e) {
+                                            e.printStackTrace();
+                                        }
+                                    }
+                                }, new Response.ErrorListener() {
+                            @Override
+                            public void onErrorResponse(VolleyError error) {
+                                System.out.println("Volley Error");
+                                }
+                            }
+                            );
+                            queue.add(stringRequest);
                             editedAddress = myPlace.getAddress()
                                     .toString().replace(' ', '+');
                             showName.setClickable(false);
@@ -97,6 +120,13 @@ public class ShowResult extends AppCompatActivity {
                         }
                     }
                 });
+    }
+
+    private String constructReviewUrl() {
+        String basicUrl = "https://maps.googleapis.com/maps/api/place/details/json?";
+        String placeId = "placeid=" + destinationList.get(randNo).getId() + "&key=AIzaSyDpKpQ2S8lvUK7xfHGgSoJXy0HG9tFU-7s";
+        String completeUrl = basicUrl + placeId;
+        return completeUrl;
     }
 
     private void showTextViews(Place myPlace) { // for debug purpose
