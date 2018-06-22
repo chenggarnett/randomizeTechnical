@@ -44,17 +44,18 @@ import java.util.HashSet;
 
 public class MainActivity extends FragmentActivity {
 
-    private FusedLocationProviderClient mFusedLocationClient;
     private static final int LOC_REQ_CODE = 1;
-    private String[] userInput = new String[3];
+    private String[] userInput = new String[4];
+    private AutoCompleteTextView keyWordInput;
     EditText radiusInput;
     EditText priceInput;
-    AutoCompleteTextView keyWordInput;
-
+    EditText ratingInput;
+    private Intent i;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        i = getIntent();
         keyWordInput = findViewById(R.id.searchKeyTxt);
         ArrayList<String> keywords = getKeywordsForAutocomplete();
 //        for (String keyword: keywords) { // for debug purpose
@@ -64,16 +65,18 @@ public class MainActivity extends FragmentActivity {
                 ArrayAdapter(this,android.R.layout.simple_list_item_1, keywords);
         keyWordInput.setAdapter(adapter);
         keyWordInput.setThreshold(1);
-        if (isLocationAccessPermitted()) {
-            mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        } else {
-            Toast.makeText(this, "Please enable your location service", Toast.LENGTH_LONG).show();
-        }
+    }
 
+    public void onSubmitClicked() {
+        mainFunc();
     }
 
     @SuppressWarnings("MissingPermission")
-    private void mainFunc() {
+    private int mainFunc() {
+        int a = returnUsersInputsForURL();
+        if(a != 0)
+            return a;
+        FusedLocationProviderClient mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         mFusedLocationClient.getLastLocation()
             .addOnCompleteListener(this, new OnCompleteListener<Location>() {
                 @Override
@@ -82,16 +85,10 @@ public class MainActivity extends FragmentActivity {
                         Location mLastLocation = task.getResult();
                         double latitude = mLastLocation.getLatitude();
                         double longitude = mLastLocation.getLongitude();
-                        System.out.println("Last known Location Latitude is " +
-                                mLastLocation.getLatitude()); // debugPrint purpose
-                        System.out.println("Last known Location Longitude is " +
-                                mLastLocation.getLongitude()); // debugPrint purpose
-                        returnUsersInputsForURL();
-                        if (Double.parseDouble(userInput[0]) < 1000 || Double.parseDouble(userInput[0]) > 50000) {
-                            radiusInput.setText("");
-                            Toast.makeText(getApplicationContext(), "Radius range: 1-50", Toast.LENGTH_LONG).show();
-                            return;
-                        }
+//                        System.out.println("Last known Location Latitude is " +
+//                                mLastLocation.getLatitude()); // debugPrint purpose
+//                        System.out.println("Last known Location Longitude is " +
+//                                mLastLocation.getLongitude()); // debugPrint purpose
                         String completeUrl = constructNearbySearchUrl(latitude, longitude, "restaurant", userInput[0], userInput[1], userInput[2]);
                         System.out.println(completeUrl); // debugPrint purpose
                         RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
@@ -99,38 +96,10 @@ public class MainActivity extends FragmentActivity {
                             new Response.Listener<String>() {
                                 @Override
                                 public void onResponse(String response) {
-                                    try {
-                                        JSONObject obj = new JSONObject(response);
-                                        JSONArray results = obj.getJSONArray("results");
-                                        EditText ratingInput = findViewById(R.id.ratingTxt);
-                                        String ratingString = ratingInput.getText().toString();
-                                        double userRating = Double.parseDouble(ratingString);
-                                        if (userRating < 0 || userRating > 5) {
-                                            ratingInput.setText("");
-                                            Toast.makeText(getApplicationContext(), "Rating range: 1-5", Toast.LENGTH_LONG).show();
-                                            return;
-                                        }
-                                        HashSet<Destination> destinationList = new HashSet<>();
-                                        for (int i = 0; i < results.length(); i++) {
-                                            String name = results.getJSONObject(i).getString("name");
-                                            String address = results.getJSONObject(i).getString("vicinity");
-                                            String placeId = results.getJSONObject(i).getString("place_id");
-                                            String ratingStr = results.getJSONObject(i).getString("rating");
-                                            double rating = Double.parseDouble(ratingStr);
-                                            Destination d = new Destination(name, address, placeId, rating);
-                                            if (rating >= userRating)
-                                                destinationList.add(d);
-                                        }
-//                                        for (Destination d: destinationList) { // for debug purpose
-//                                            System.out.println(d);
-//                                        }
-                                        ArrayList<Destination> destinations = new ArrayList<>(destinationList);
-                                        Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
-                                        showResultActivity.putExtra("DESTINATIONS", destinations);
-                                        startActivity(showResultActivity);
-                                    } catch (JSONException e) {
-                                        e.printStackTrace();
-                                    }
+                                    ArrayList<Destination> destinations = getDestinationList(response);
+                                    Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
+                                    showResultActivity.putExtra("DESTINATIONS", destinations);
+                                    startActivity(showResultActivity);
                                 }
                             }, new Response.ErrorListener() {
                             @Override
@@ -145,26 +114,69 @@ public class MainActivity extends FragmentActivity {
                     }
                 }
             });
+        return 0;
     }
 
-    public void onSubmitClicked(View v) {
-        mainFunc();
-    }
 
-    private void returnUsersInputsForURL() {
+    private int returnUsersInputsForURL() {
         radiusInput = findViewById(R.id.radiusTxt);
-        priceInput = findViewById(R.id.priceTxt);
-
-        String keyword = keyWordInput.getText().toString();
         String radiusString = radiusInput.getText().toString();
         double radius = Double.parseDouble(radiusString) * 1000;
+        if (radius < 1000 || radius > 50000) {
+            radiusInput.setText("");
+            Toast.makeText(getApplicationContext(), "Radius range: 1-50", Toast.LENGTH_LONG).show();
+            return 2;
+        }
         radiusString  = Double.toString(radius);
+        String keyword = keyWordInput.getText().toString();
         keyword = keyword.replace(' ', '+');
+        priceInput = findViewById(R.id.priceTxt);
         String maxPrice = priceInput.getText().toString();
+        ratingInput = findViewById(R.id.ratingTxt);
+        String ratingString = ratingInput.getText().toString();
+        double userRating = Double.parseDouble(ratingString);
+        if (userRating < 0 || userRating > 5) {
+            ratingInput.setText("");
+            Toast.makeText(getApplicationContext(), "Rating range: 1-5", Toast.LENGTH_LONG).show();
+            return 3;
+        }
         userInput[0] = radiusString;
         userInput[1] = keyword;
         userInput[2] = maxPrice;
+        userInput[3] = Double.toString(userRating);
+        for (int i = 0; i < userInput.length; i++) {
+            if (userInput[i] == null)
+                return 1;
+        }
+
+        return 0;
     }
+
+    private ArrayList<Destination> getDestinationList(String response) {
+        try {
+            JSONObject obj = new JSONObject(response);
+            JSONArray results = obj.getJSONArray("results");
+            HashSet<Destination> destinationList = new HashSet<>();
+            for (int i = 0; i < results.length(); i++) {
+                String name = results.getJSONObject(i).getString("name");
+                String address = results.getJSONObject(i).getString("vicinity");
+                String placeId = results.getJSONObject(i).getString("place_id");
+                String ratingStr = results.getJSONObject(i).getString("rating");
+                double rating = Double.parseDouble(ratingStr);
+                Destination d = new Destination(name, address, placeId, rating);
+                if (rating >= Double.parseDouble(userInput[3]))
+                    destinationList.add(d);
+            }
+//            for (Destination d: destinationList) { // for debug purpose
+//                System.out.println(d);
+//            }
+            return new ArrayList<>(destinationList);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
 
     private ArrayList<String> getKeywordsForAutocomplete() {
         System.out.println("Inside getKeywordsForAutoComplete function"); // for debug purpose
