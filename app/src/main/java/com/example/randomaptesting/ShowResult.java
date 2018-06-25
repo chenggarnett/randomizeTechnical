@@ -42,7 +42,7 @@ import java.util.Random;
 
 public class ShowResult extends AppCompatActivity {
 
-    private String editedAddress;
+    private String latAndLong;
     private String placeUrl;
     private ArrayList<Destination> destinationList;
     private int randNo;
@@ -75,35 +75,9 @@ public class ShowResult extends AppCompatActivity {
                             PlaceBufferResponse places = task.getResult();
                             Place myPlace = places.get(0);
                             System.out.println("Place found: " + myPlace.getName()); // debugPrint purpose
-                            String completeUrl = constructReviewUrl();
-                            System.out.println(completeUrl); // for debug purpose
-                            RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
-                            StringRequest stringRequest = new StringRequest(Request.Method.GET, completeUrl,
-                                new Response.Listener<String>() {
-                                    @Override
-                                    public void onResponse(String response) {
-                                        try {
-                                            JSONObject obj = new JSONObject(response);
-                                            JSONArray reviews = obj.getJSONObject("result").getJSONArray("reviews");
-                                            if (reviews != null) {
-//                                                for (int i = 0; i < reviews.length(); i++) { // for debug purpose
-//                                                    System.out.println(reviews.get(i));
-//                                                }
-                                            }
-                                        } catch (JSONException e) {
-                                            e.printStackTrace();
-                                        }
-                                    }
-                                }, new Response.ErrorListener() {
-                            @Override
-                            public void onErrorResponse(VolleyError error) {
-                                System.out.println("Volley Error");
-                                }
-                            }
-                            );
-                            queue.add(stringRequest);
-                            editedAddress = myPlace.getAddress()
-                                    .toString().replace(' ', '+');
+                            latAndLong = myPlace.getLatLng().toString();
+                            latAndLong = latAndLong.substring(10, latAndLong.length() - 1);
+                            System.out.println("Lat and Long: " + latAndLong); // for debug purpose
                             showName.setClickable(false);
                             if (myPlace.getWebsiteUri() != null) {
                                 placeUrl = myPlace.getWebsiteUri().toString();
@@ -122,13 +96,6 @@ public class ShowResult extends AppCompatActivity {
                 });
     }
 
-    private String constructReviewUrl() {
-        String basicUrl = "https://maps.googleapis.com/maps/api/place/details/json?";
-        String placeId = "placeid=" + destinationList.get(randNo).getId() + "&key=AIzaSyDpKpQ2S8lvUK7xfHGgSoJXy0HG9tFU-7s";
-        String completeUrl = basicUrl + placeId;
-        return completeUrl;
-    }
-
     private void showTextViews(Place myPlace) { // for debug purpose
         TextView showAddress = findViewById(R.id.showAddressTxt);
         TextView showNoOfResults = findViewById(R.id.showNoOfResultsTxt);
@@ -141,7 +108,7 @@ public class ShowResult extends AppCompatActivity {
 
     public void onGoClicked(View v) {
         System.out.println("Inside onGoClicked function"); // for debug purpose
-        goToDestination(editedAddress);
+        goToDestination(latAndLong);
     }
 
     public void onRefreshClicked(View v) {
@@ -173,8 +140,8 @@ public class ShowResult extends AppCompatActivity {
         startActivity(intent);
     }
 
-    private void goToDestination(String editedAddress) {
-        Uri gmmIntentUri = Uri.parse("google.navigation:q=" + editedAddress);
+    private void goToDestination(String latAndLong) {
+        Uri gmmIntentUri = Uri.parse("google.navigation:q=" + latAndLong);
         Intent mapIntent = new Intent(Intent.ACTION_VIEW, gmmIntentUri);
         mapIntent.setPackage("com.google.android.apps.maps");
         startActivity(mapIntent);

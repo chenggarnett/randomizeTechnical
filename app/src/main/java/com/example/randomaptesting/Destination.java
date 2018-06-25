@@ -15,6 +15,12 @@ public class Destination implements Serializable{
         id = i;
         rating = r;
     }
+//
+//    public Destination(String n, String a, String i) {
+//        name = n;
+//        address = a;
+//        id = i;
+//    }
 
     public String getName() {
         return name;

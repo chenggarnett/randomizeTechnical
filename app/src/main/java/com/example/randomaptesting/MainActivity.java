@@ -50,12 +50,10 @@ public class MainActivity extends FragmentActivity {
     EditText radiusInput;
     EditText priceInput;
     EditText ratingInput;
-    private Intent i;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        i = getIntent();
         keyWordInput = findViewById(R.id.searchKeyTxt);
         ArrayList<String> keywords = getKeywordsForAutocomplete();
 //        for (String keyword: keywords) { // for debug purpose
@@ -67,7 +65,7 @@ public class MainActivity extends FragmentActivity {
         keyWordInput.setThreshold(1);
     }
 
-    public void onSubmitClicked() {
+    public void onSubmitClicked(View v) {
         mainFunc();
     }
 
@@ -162,6 +160,8 @@ public class MainActivity extends FragmentActivity {
                 String address = results.getJSONObject(i).getString("vicinity");
                 String placeId = results.getJSONObject(i).getString("place_id");
                 String ratingStr = results.getJSONObject(i).getString("rating");
+                if (ratingStr == null)
+                    continue;
                 double rating = Double.parseDouble(ratingStr);
                 Destination d = new Destination(name, address, placeId, rating);
                 if (rating >= Double.parseDouble(userInput[3]))
