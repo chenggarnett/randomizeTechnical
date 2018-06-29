@@ -7,20 +7,33 @@ public class Destination implements Serializable{
     private String name;
     private String address;
     private String id;
+    private double distance;
     private double rating;
+    private int price;
 
-    public Destination(String n, String a , String i,  double r) {
+    public Destination(String n, String a , String i, double d, double r, int p) {
         name = n;
         address = a;
         id = i;
+        distance = d;
+        rating = r;
+        price = p;
+    }
+
+    public Destination(String n, String a , String i, double d, double r) {
+        name = n;
+        address = a;
+        id = i;
+        distance = d;
         rating = r;
     }
-//
-//    public Destination(String n, String a, String i) {
-//        name = n;
-//        address = a;
-//        id = i;
-//    }
+
+    public Destination(String n, String a, String i, double d) {
+        name = n;
+        address = a;
+        id = i;
+        distance = d;
+    }
 
     public String getName() {
         return name;
@@ -34,9 +47,13 @@ public class Destination implements Serializable{
         return id;
     }
 
+    public double getDistance() { return distance; }
+
     public double getRating() {
         return rating;
     }
+
+    public int getPrice() { return price; }
 
     public boolean equals(Object x) {
         Destination d = (Destination)x;

@@ -12,7 +12,6 @@ import android.support.v4.content.ContextCompat;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
@@ -45,11 +44,15 @@ import java.util.HashSet;
 public class MainActivity extends FragmentActivity {
 
     private static final int LOC_REQ_CODE = 1;
-    private String[] userInput = new String[4];
     private AutoCompleteTextView keyWordInput;
     EditText radiusInput;
     EditText priceInput;
     EditText ratingInput;
+    String userKeyword;
+    double userRadius;
+    double userPrice;
+    double userRating;
+
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -71,7 +74,7 @@ public class MainActivity extends FragmentActivity {
 
     @SuppressWarnings("MissingPermission")
     private int mainFunc() {
-        int a = returnUsersInputsForURL();
+        int a = returnInputsForURL();
         if(a != 0)
             return a;
         FusedLocationProviderClient mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
@@ -81,22 +84,57 @@ public class MainActivity extends FragmentActivity {
                 public void onComplete(@NonNull Task<Location> task) {
                     if (task.isSuccessful() && task.getResult() != null) {
                         Location mLastLocation = task.getResult();
-                        double latitude = mLastLocation.getLatitude();
-                        double longitude = mLastLocation.getLongitude();
+                        final double myLatitude = mLastLocation.getLatitude();
+                        final double myLongitude = mLastLocation.getLongitude();
 //                        System.out.println("Last known Location Latitude is " +
 //                                mLastLocation.getLatitude()); // debugPrint purpose
 //                        System.out.println("Last known Location Longitude is " +
 //                                mLastLocation.getLongitude()); // debugPrint purpose
-                        String completeUrl = constructNearbySearchUrl(latitude, longitude, "restaurant", userInput[0], userInput[1], userInput[2]);
+                        String completeUrl = constructNearbySearchUrl(myLatitude, myLongitude, "restaurant", userRadius * 1.5, userKeyword);
                         System.out.println(completeUrl); // debugPrint purpose
                         RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
                         StringRequest stringRequest = new StringRequest(Request.Method.GET, completeUrl,
                             new Response.Listener<String>() {
                                 @Override
                                 public void onResponse(String response) {
-                                    ArrayList<Destination> destinations = getDestinationList(response);
+                                    ArrayList<Destination> destinationList = new ArrayList<>();
+                                    try {
+                                        JSONObject obj = new JSONObject(response);
+                                        JSONArray results = obj.getJSONArray("results");
+                                        for (int i = 0; i < results.length(); i++) {
+                                            String name = results.getJSONObject(i).getString("name");
+                                            String address = results.getJSONObject(i).getString("vicinity");
+                                            String placeId = results.getJSONObject(i).getString("place_id");
+                                            String ratingStr = results.getJSONObject(i).getString("rating");
+                                            String priceStr = results.getJSONObject(i).getString("price_level");
+                                            String latitude = results.getJSONObject(i).getJSONObject("geometry")
+                                                    .getJSONObject("location").getString("lat");
+                                            String longitude = results.getJSONObject(i).getJSONObject("geometry")
+                                                    .getJSONObject("location").getString("lng");
+                                            double placeLatitude = Double.parseDouble(latitude);
+                                            double placeLongitude = Double.parseDouble(longitude);
+                                            System.out.println("placeLatitude:" + placeLatitude); // for debug purpose
+                                            System.out.println("placeLongitude:" + placeLongitude); // for debug purpose
+                                            double distance = calculateDistance(myLatitude, myLongitude, placeLatitude, placeLongitude) * 1000;
+                                            System.out.println("Distance:" + distance); // for debug purpose
+                                            if (ratingStr == null) {
+                                                Destination d = new Destination(name, address, placeId, distance);
+                                                destinationList.add(d);
+                                            }
+                                            double rating = Double.parseDouble(ratingStr);
+                                            if (priceStr == null) {
+                                                Destination d = new Destination(name, address, placeId, distance, rating);
+                                                destinationList.add(d);
+                                            }
+                                            int price = Integer.parseInt(priceStr);
+                                            Destination d = new Destination(name, address, placeId, distance, rating, price);
+                                            destinationList.add(d);
+                                        }
+                                    } catch (JSONException e) {
+                                        e.printStackTrace();
+                                    }
                                     Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
-                                    showResultActivity.putExtra("DESTINATIONS", destinations);
+                                    showResultActivity.putExtra("DESTINATIONS", destinationList);
                                     startActivity(showResultActivity);
                                 }
                             }, new Response.ErrorListener() {
@@ -115,68 +153,47 @@ public class MainActivity extends FragmentActivity {
         return 0;
     }
 
+    private double calculateDistance(double myLatitude, double myLongitude, double placeLatitude, double placeLongitude) {
+        double earthRadius = 6371;
+        double latDiff = degreeToRadians(placeLatitude - myLatitude);
+        double longDiff = degreeToRadians(placeLongitude - myLongitude);
+        double a = Math.pow(Math.sin(latDiff/2), 2)
+                + Math.cos(degreeToRadians(myLatitude)) * Math.cos(degreeToRadians(placeLatitude))
+                * Math.pow(Math.sin(longDiff/2), 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        double d = earthRadius * c;
+        return d;
+    }
 
-    private int returnUsersInputsForURL() {
+    private double degreeToRadians(double degree) {
+        return degree * (Math.PI/180);
+    }
+
+
+    private int returnInputsForURL() {
         radiusInput = findViewById(R.id.radiusTxt);
         String radiusString = radiusInput.getText().toString();
-        double radius = Double.parseDouble(radiusString) * 1000;
-        if (radius < 1000 || radius > 50000) {
+        userRadius = Double.parseDouble(radiusString) * 1000;
+        if (userRadius < 1000 || userRadius > 10000) {
             radiusInput.setText("");
-            Toast.makeText(getApplicationContext(), "Radius range: 1-50", Toast.LENGTH_LONG).show();
+            Toast.makeText(getApplicationContext(), "Radius range: 1-10", Toast.LENGTH_LONG).show();
             return 2;
         }
-        radiusString  = Double.toString(radius);
-        String keyword = keyWordInput.getText().toString();
-        keyword = keyword.replace(' ', '+');
+        userKeyword = keyWordInput.getText().toString();
+        userKeyword = userKeyword.replace(' ', '+');
         priceInput = findViewById(R.id.priceTxt);
-        String maxPrice = priceInput.getText().toString();
+        String price = priceInput.getText().toString();
+        userPrice = Double.parseDouble(price);
         ratingInput = findViewById(R.id.ratingTxt);
         String ratingString = ratingInput.getText().toString();
-        double userRating = Double.parseDouble(ratingString);
+        userRating = Double.parseDouble(ratingString);
         if (userRating < 0 || userRating > 5) {
             ratingInput.setText("");
             Toast.makeText(getApplicationContext(), "Rating range: 1-5", Toast.LENGTH_LONG).show();
             return 3;
         }
-        userInput[0] = radiusString;
-        userInput[1] = keyword;
-        userInput[2] = maxPrice;
-        userInput[3] = Double.toString(userRating);
-        for (int i = 0; i < userInput.length; i++) {
-            if (userInput[i] == null)
-                return 1;
-        }
-
         return 0;
     }
-
-    private ArrayList<Destination> getDestinationList(String response) {
-        try {
-            JSONObject obj = new JSONObject(response);
-            JSONArray results = obj.getJSONArray("results");
-            HashSet<Destination> destinationList = new HashSet<>();
-            for (int i = 0; i < results.length(); i++) {
-                String name = results.getJSONObject(i).getString("name");
-                String address = results.getJSONObject(i).getString("vicinity");
-                String placeId = results.getJSONObject(i).getString("place_id");
-                String ratingStr = results.getJSONObject(i).getString("rating");
-                if (ratingStr == null)
-                    continue;
-                double rating = Double.parseDouble(ratingStr);
-                Destination d = new Destination(name, address, placeId, rating);
-                if (rating >= Double.parseDouble(userInput[3]))
-                    destinationList.add(d);
-            }
-//            for (Destination d: destinationList) { // for debug purpose
-//                System.out.println(d);
-//            }
-            return new ArrayList<>(destinationList);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
 
     private ArrayList<String> getKeywordsForAutocomplete() {
         System.out.println("Inside getKeywordsForAutoComplete function"); // for debug purpose
@@ -197,16 +214,15 @@ public class MainActivity extends FragmentActivity {
     }
 
     private String constructNearbySearchUrl(double latitude, double longitude,
-                                            String type, String radius, String key, String maxPrice) {
+                                            String type, double radius, String key) {
         String basicUrl ="https://maps.googleapis.com/maps/api/place/nearbysearch/json?";
         String latAndLong = "location=" + Double.toString(latitude) + "," + Double.toString(longitude);
         String radiusFrCurrentLocation = "&radius=" + radius;
         String placeType = "&type=" + type;
         String keyword = "&keyword=" + key + "&opennow=1";
-        String maxP = "&maxprice=" + maxPrice;
         String apiKey = "&key=AIzaSyDpKpQ2S8lvUK7xfHGgSoJXy0HG9tFU-7s";
         String completeUrl = basicUrl + latAndLong + radiusFrCurrentLocation
-                + placeType + keyword + maxP + apiKey;
+                + placeType + keyword + apiKey;
         return completeUrl;
     }
 
