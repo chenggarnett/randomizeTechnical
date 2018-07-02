@@ -1,7 +1,6 @@
 package com.example.randomaptesting;
 
 import android.Manifest;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
@@ -35,7 +34,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
-import java.util.HashSet;
 
 /**
  * Created by chengchinlim on 5/29/18.
@@ -113,10 +111,10 @@ public class MainActivity extends FragmentActivity {
                                                     .getJSONObject("location").getString("lng");
                                             double placeLatitude = Double.parseDouble(latitude);
                                             double placeLongitude = Double.parseDouble(longitude);
-                                            System.out.println("placeLatitude:" + placeLatitude); // for debug purpose
-                                            System.out.println("placeLongitude:" + placeLongitude); // for debug purpose
+//                                            System.out.println("placeLatitude: " + placeLatitude); // for debug purpose
+//                                            System.out.println("placeLongitude: " + placeLongitude); // for debug purpose
                                             double distance = calculateDistance(myLatitude, myLongitude, placeLatitude, placeLongitude) * 1000;
-                                            System.out.println("Distance:" + distance); // for debug purpose
+//                                            System.out.println("Distance:" + distance); // for debug purpose
                                             if (ratingStr == null) {
                                                 Destination d = new Destination(name, address, placeId, distance);
                                                 destinationList.add(d);
@@ -133,9 +131,30 @@ public class MainActivity extends FragmentActivity {
                                     } catch (JSONException e) {
                                         e.printStackTrace();
                                     }
-                                    Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
-                                    showResultActivity.putExtra("DESTINATIONS", destinationList);
-                                    startActivity(showResultActivity);
+                                    System.out.println("Destinations:"); // for debug purpose
+                                    for (int i = 0; i < destinationList.size(); i++) {
+                                        System.out.println(i+1 + ". " + destinationList.get(i));
+                                    }
+                                    ArrayList<Destination> matchUserReqList = new ArrayList<>();
+                                    ArrayList<Destination> suggestions = new ArrayList<>();
+                                    for (Destination d: destinationList) {
+                                        if (matchUserReq(d)) {
+                                            matchUserReqList.add(d);
+                                        } else {
+                                            suggestions.add(d);
+                                        }
+                                    }
+                                    System.out.println("matchUserReqList: ");
+                                    for (Destination d : matchUserReqList) {
+                                        System.out.println(d);
+                                    }
+                                    System.out.println("Suggestions: ");
+                                    for (Destination d : suggestions) {
+                                        System.out.println(d);
+                                    }
+//                                    Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
+//                                    showResultActivity.putExtra("DESTINATIONS", destinationList);
+//                                    startActivity(showResultActivity);
                                 }
                             }, new Response.ErrorListener() {
                             @Override
@@ -151,6 +170,28 @@ public class MainActivity extends FragmentActivity {
                 }
             });
         return 0;
+    }
+
+    private boolean matchUserReq(Destination d) {
+        if (d.getDistance() > userRadius) {
+            return false;
+        }
+        if (d.getRating() != 0) {
+            if (d.getRating() < userRating) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+        if (d.getPrice() != 0) {
+            if (d.getPrice() > userPrice) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+
+        return true;
     }
 
     private double calculateDistance(double myLatitude, double myLongitude, double placeLatitude, double placeLongitude) {

@@ -54,8 +54,14 @@ public class ShowResult extends AppCompatActivity {
         setContentView(R.layout.activity_show_result);
         showName = findViewById(R.id.showNameTxt);
         destinationList = (ArrayList<Destination>)getIntent().getSerializableExtra("DESTINATIONS");
-        getTheOne(destinationList);
+
+//        getTheOne(destinationList);
     }
+
+
+
+
+
 
     private void getTheOne(final ArrayList<Destination> destinationList) {
         debugPrint(destinationList); // for debug purpose

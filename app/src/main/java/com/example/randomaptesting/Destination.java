@@ -81,6 +81,8 @@ public class Destination implements Serializable{
         return "Name: " + name + "\n"
                 + "Address: " + address + "\n"
                 + "Place ID: " + id + "\n"
-                + "Rating: " + rating;
+                + "Distance: " + distance + "\n"
+                + "Rating: " + rating +"\n"
+                + "Price Level: " + price;
     }
 }
