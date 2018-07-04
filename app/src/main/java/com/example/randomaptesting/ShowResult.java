@@ -9,6 +9,7 @@ import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -44,18 +45,23 @@ public class ShowResult extends AppCompatActivity {
 
     private String latAndLong;
     private String placeUrl;
-    private ArrayList<Destination> destinationList;
+    private ArrayList<Destination> matchUserReqList;
+    private ArrayList<Destination> suggestions;
+    Button shuffleBtn;
     private int randNo;
+    private int shuffleCount = 0;
     TextView showName;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_show_result);
+        shuffleBtn = findViewById(R.id.shuffleBtn);
+        shuffleBtn.setText("Shuffle");
         showName = findViewById(R.id.showNameTxt);
-        destinationList = (ArrayList<Destination>)getIntent().getSerializableExtra("DESTINATIONS");
-
-//        getTheOne(destinationList);
+        matchUserReqList = (ArrayList<Destination>)getIntent().getSerializableExtra("matchUserReqList");
+        suggestions = (ArrayList<Destination>)getIntent().getSerializableExtra("suggestions");
+        getTheOne();
     }
 
 
@@ -63,16 +69,25 @@ public class ShowResult extends AppCompatActivity {
 
 
 
-    private void getTheOne(final ArrayList<Destination> destinationList) {
-        debugPrint(destinationList); // for debug purpose
-        if (destinationList.size() == 0) {
+    private void getTheOne() {
+//        debugPrint(destinationList); // for debug purpose
+        if (matchUserReqList.size() == 0) {
             Toast.makeText(this,"0 results", Toast.LENGTH_LONG).show();
+            shuffleBtn.setText("list");
             return;
         }
-        randNo = randomize(destinationList.size());
+        shuffleCount++;
+        if (shuffleCount > 4) {
+            Toast.makeText(getApplicationContext(), "I think a list is better for you", Toast.LENGTH_SHORT).show();
+            shuffleBtn.setText("list");
+            return;
+        } else {
+            Toast.makeText(getApplicationContext(), "shuffle count:" + shuffleCount, Toast.LENGTH_SHORT).show(); // debug purpose
+        }
+        randNo = randomize(matchUserReqList.size());
         GeoDataClient mGeoDataClient = Places
                 .getGeoDataClient(getApplicationContext(), null);
-        mGeoDataClient.getPlaceById(destinationList
+        mGeoDataClient.getPlaceById(matchUserReqList
                 .get(randNo).getId())
                 .addOnCompleteListener(new OnCompleteListener<PlaceBufferResponse>() {
                     @Override
@@ -109,7 +124,7 @@ public class ShowResult extends AppCompatActivity {
         showName.setText(myPlace.getName());
         showAddress.setText(myPlace.getAddress());
         showRating.setText("Rating: " + myPlace.getRating());
-        showNoOfResults.setText("No of results: " + destinationList.size());
+        showNoOfResults.setText("No of results: " + matchUserReqList.size());
     }
 
     public void onGoClicked(View v) {
@@ -117,10 +132,15 @@ public class ShowResult extends AppCompatActivity {
         goToDestination(latAndLong);
     }
 
-    public void onRefreshClicked(View v) {
-        System.out.println("Inside onRefreshClicked function"); // for debug purpose
-        destinationList.remove(randNo);
-        getTheOne(destinationList);
+    public void onShuffleClicked(View v) {
+        System.out.println("Inside onShuffleClicked function"); // for debug purpose
+        if (shuffleCount <= 4) {
+            matchUserReqList.remove(randNo);
+            getTheOne();
+        } else {
+            System.out.println("Should print out the list"); // debug purpose
+        }
+
     }
 
     public void onHomeClicked(View v) {
@@ -137,8 +157,8 @@ public class ShowResult extends AppCompatActivity {
 
     public void onAddressClicked(View v) {
         String basicUrl = "https://www.google.com/search?biw=1440&bih=803&tbm=isch&sa=1&ei=YHwoW4igCueO0gKS57r4Bg&q=";
-        String placeName = destinationList.get(randNo).getName();
-        String placeAddress = destinationList.get(randNo).getAddress();
+        String placeName = matchUserReqList.get(randNo).getName();
+        String placeAddress = matchUserReqList.get(randNo).getAddress();
         placeName = placeName.replace(' ', '+');
         String completeUrl = basicUrl + placeName + "+restaurant+" + placeAddress;
         Uri uri = Uri.parse(completeUrl);

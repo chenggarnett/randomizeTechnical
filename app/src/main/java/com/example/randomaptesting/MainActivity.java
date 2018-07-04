@@ -1,6 +1,7 @@
 package com.example.randomaptesting;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
@@ -50,7 +51,6 @@ public class MainActivity extends FragmentActivity {
     double userRadius;
     double userPrice;
     double userRating;
-
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -135,8 +135,10 @@ public class MainActivity extends FragmentActivity {
                                     for (int i = 0; i < destinationList.size(); i++) {
                                         System.out.println(i+1 + ". " + destinationList.get(i));
                                     }
+
                                     ArrayList<Destination> matchUserReqList = new ArrayList<>();
                                     ArrayList<Destination> suggestions = new ArrayList<>();
+
                                     for (Destination d: destinationList) {
                                         if (matchUserReq(d)) {
                                             matchUserReqList.add(d);
@@ -144,17 +146,18 @@ public class MainActivity extends FragmentActivity {
                                             suggestions.add(d);
                                         }
                                     }
-                                    System.out.println("matchUserReqList: ");
+                                    System.out.println("MatchUserReqList: "); // for debug purpose
                                     for (Destination d : matchUserReqList) {
                                         System.out.println(d);
                                     }
-                                    System.out.println("Suggestions: ");
+                                    System.out.println("Suggestions: "); // for debug purpose
                                     for (Destination d : suggestions) {
                                         System.out.println(d);
                                     }
-//                                    Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
-//                                    showResultActivity.putExtra("DESTINATIONS", destinationList);
-//                                    startActivity(showResultActivity);
+                                    Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
+                                    showResultActivity.putExtra("matchUserReqList", matchUserReqList);
+                                    showResultActivity.putExtra("suggestions", suggestions);
+                                    startActivity(showResultActivity);
                                 }
                             }, new Response.ErrorListener() {
                             @Override
@@ -164,6 +167,7 @@ public class MainActivity extends FragmentActivity {
                         }
                         );
                         queue.add(stringRequest);
+
                     } else {
                         System.out.println("No Last known location found. Try current location..!");
                     }

@@ -69,12 +69,12 @@
         app:layout_constraintTop_toBottomOf="@+id/showAddressTxt" />
 
     <Button
-        android:id="@+id/refreshBtn"
+        android:id="@+id/shuffleBtn"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="36dp"
         android:layout_marginTop="44dp"
-        android:onClick="onRefreshClicked"
+        android:onClick="onShuffleClicked"
         android:text="shuffle"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/showNoOfResultsTxt" />
