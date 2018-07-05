@@ -12,8 +12,11 @@ import android.support.v4.content.ContextCompat;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
-import android.widget.EditText;
+import android.widget.RatingBar;
+import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ToggleButton;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
@@ -44,17 +47,28 @@ public class MainActivity extends FragmentActivity {
 
     private static final int LOC_REQ_CODE = 1;
     private AutoCompleteTextView keyWordInput;
-    EditText radiusInput;
-    EditText priceInput;
-    EditText ratingInput;
+    SeekBar radiusBar;
+    TextView radiusTxt;
+    ToggleButton cheap;
+    ToggleButton normal;
+    ToggleButton expensive;
+    ToggleButton extreme;
+    RatingBar ratingBar;
+    TextView ratingTxt;
     String userKeyword;
     double userRadius;
-    double userPrice;
+    int userPrice;
     double userRating;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        listenerForRadiusBar();
+        cheap = findViewById(R.id.cheap);
+        normal = findViewById(R.id.normal);
+        expensive = findViewById(R.id.expensive);
+        extreme = findViewById(R.id.extreme);
+        listenerForRatingBar();
         keyWordInput = findViewById(R.id.searchKeyTxt);
         ArrayList<String> keywords = getKeywordsForAutocomplete();
 //        for (String keyword: keywords) { // for debug purpose
@@ -68,6 +82,73 @@ public class MainActivity extends FragmentActivity {
 
     public void onSubmitClicked(View v) {
         mainFunc();
+    }
+
+    public void onCheapClicked(View v) {
+        cheap.setChecked(true);
+        normal.setChecked(false);
+        expensive.setChecked(false);
+        extreme.setChecked(false);
+    }
+
+    public void onNormalClicked(View v) {
+        cheap.setChecked(false);
+        normal.setChecked(true);
+        expensive.setChecked(false);
+        extreme.setChecked(false);
+    }
+
+    public void onExpensiveClicked(View v) {
+        cheap.setChecked(false);
+        normal.setChecked(false);
+        expensive.setChecked(true);
+        extreme.setChecked(false);
+    }
+
+    public void onExtremeClicked(View v) {
+        cheap.setChecked(false);
+        normal.setChecked(false);
+        expensive.setChecked(false);
+        extreme.setChecked(true);
+    }
+
+    public void listenerForRatingBar() {
+        ratingBar = findViewById(R.id.ratingBar);
+        ratingTxt = findViewById(R.id.ratingTxt);
+        ratingBar.setOnRatingBarChangeListener(new RatingBar.OnRatingBarChangeListener() {
+            @Override
+            public void onRatingChanged(RatingBar ratingBar, float rating, boolean fromUser) {
+                ratingTxt.setText(Float.toString(rating));
+                if (rating < 1.0f) {
+                    ratingBar.setRating(1.0f);
+                }
+            }
+        });
+    }
+
+    public void listenerForRadiusBar() {
+        radiusBar = findViewById(R.id.radiusBar);
+        radiusTxt = findViewById(R.id.radiusTxt);
+        radiusBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                userRadius = ((double)progress/10);
+                radiusTxt.setText(Double.toString(userRadius));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                if (userRadius < 1) {
+                    Toast.makeText(getApplicationContext(), "Minimum is 1, radius will be set to 1", Toast.LENGTH_SHORT).show();
+                    userRadius = 1;
+                }
+            }
+        });
     }
 
     @SuppressWarnings("MissingPermission")
@@ -147,12 +228,12 @@ public class MainActivity extends FragmentActivity {
                                         }
                                     }
                                     System.out.println("MatchUserReqList: "); // for debug purpose
-                                    for (Destination d : matchUserReqList) {
-                                        System.out.println(d);
+                                    for (int i = 0; i < matchUserReqList.size(); i++) {
+                                        System.out.println(Integer.toString(i+1) + ". " + matchUserReqList.get(i));
                                     }
                                     System.out.println("Suggestions: "); // for debug purpose
-                                    for (Destination d : suggestions) {
-                                        System.out.println(d);
+                                    for (int i = 0; i < suggestions.size(); i++) {
+                                        System.out.println(Integer.toString(i+1) + ". " + suggestions.get(i));
                                     }
                                     Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
                                     showResultActivity.putExtra("matchUserReqList", matchUserReqList);
@@ -216,27 +297,21 @@ public class MainActivity extends FragmentActivity {
 
 
     private int returnInputsForURL() {
-        radiusInput = findViewById(R.id.radiusTxt);
-        String radiusString = radiusInput.getText().toString();
-        userRadius = Double.parseDouble(radiusString) * 1000;
-        if (userRadius < 1000 || userRadius > 10000) {
-            radiusInput.setText("");
-            Toast.makeText(getApplicationContext(), "Radius range: 1-10", Toast.LENGTH_LONG).show();
-            return 2;
+        userRadius *= 1000;
+//        System.out.println("userRadius: " + userRadius); // debug purpose
+        if (cheap.isChecked()) {
+            userPrice = 1;
+        } else if (normal.isChecked()) {
+            userPrice = 1;
+        } else if (expensive.isChecked()) {
+            userPrice = 1;
+        } else {
+            userPrice = 1;
         }
+        System.out.println("userPrice: " + userPrice);
         userKeyword = keyWordInput.getText().toString();
         userKeyword = userKeyword.replace(' ', '+');
-        priceInput = findViewById(R.id.priceTxt);
-        String price = priceInput.getText().toString();
-        userPrice = Double.parseDouble(price);
-        ratingInput = findViewById(R.id.ratingTxt);
-        String ratingString = ratingInput.getText().toString();
-        userRating = Double.parseDouble(ratingString);
-        if (userRating < 0 || userRating > 5) {
-            ratingInput.setText("");
-            Toast.makeText(getApplicationContext(), "Rating range: 1-5", Toast.LENGTH_LONG).show();
-            return 3;
-        }
+        userRating = ratingBar.getRating();
         return 0;
     }
 

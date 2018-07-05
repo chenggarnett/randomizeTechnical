@@ -64,11 +64,6 @@ public class ShowResult extends AppCompatActivity {
         getTheOne();
     }
 
-
-
-
-
-
     private void getTheOne() {
 //        debugPrint(destinationList); // for debug purpose
         if (matchUserReqList.size() == 0) {
