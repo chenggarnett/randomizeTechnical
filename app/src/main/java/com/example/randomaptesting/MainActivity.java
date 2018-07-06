@@ -307,11 +307,11 @@ public class MainActivity extends FragmentActivity {
         if (cheap.isChecked()) {
             userPrice = 1;
         } else if (normal.isChecked()) {
-            userPrice = 1;
+            userPrice = 2;
         } else if (expensive.isChecked()) {
-            userPrice = 1;
+            userPrice = 3;
         } else {
-            userPrice = 1;
+            userPrice = 4;
         }
 //        System.out.println("userPrice: " + userPrice); // for debug purpose
         userRating = ratingBar.getRating();
