@@ -152,10 +152,11 @@ public class MainActivity extends FragmentActivity {
     }
 
     @SuppressWarnings("MissingPermission")
-    private int mainFunc() {
-        int a = returnInputsForURL();
-        if(a != 0)
-            return a;
+    private void mainFunc() {
+        if (!returnInputsForURL()) {
+            Toast.makeText(getApplicationContext(), "Please key in a keyword",Toast.LENGTH_SHORT).show();
+            return;
+        }
         FusedLocationProviderClient mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         mFusedLocationClient.getLastLocation()
             .addOnCompleteListener(this, new OnCompleteListener<Location>() {
@@ -254,7 +255,6 @@ public class MainActivity extends FragmentActivity {
                     }
                 }
             });
-        return 0;
     }
 
     private boolean matchUserReq(Destination d) {
@@ -296,7 +296,12 @@ public class MainActivity extends FragmentActivity {
     }
 
 
-    private int returnInputsForURL() {
+    private boolean returnInputsForURL() {
+        userKeyword = keyWordInput.getText().toString();
+        if (userKeyword.length() == 0) {
+            return false;
+        }
+        userKeyword = userKeyword.replace(' ', '+');
         userRadius *= 1000;
 //        System.out.println("userRadius: " + userRadius); // debug purpose
         if (cheap.isChecked()) {
@@ -308,11 +313,9 @@ public class MainActivity extends FragmentActivity {
         } else {
             userPrice = 1;
         }
-        System.out.println("userPrice: " + userPrice);
-        userKeyword = keyWordInput.getText().toString();
-        userKeyword = userKeyword.replace(' ', '+');
+//        System.out.println("userPrice: " + userPrice); // for debug purpose
         userRating = ratingBar.getRating();
-        return 0;
+        return true;
     }
 
     private ArrayList<String> getKeywordsForAutocomplete() {
