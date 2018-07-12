@@ -14,6 +14,7 @@ import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.RatingBar;
 import android.widget.SeekBar;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
@@ -47,6 +48,7 @@ public class MainActivity extends FragmentActivity {
 
     private static final int LOC_REQ_CODE = 1;
     private AutoCompleteTextView keyWordInput;
+    Switch metricsSwitch;
     SeekBar radiusBar;
     TextView radiusTxt;
     ToggleButton cheap;
@@ -68,6 +70,20 @@ public class MainActivity extends FragmentActivity {
         normal = findViewById(R.id.normal);
         expensive = findViewById(R.id.expensive);
         extreme = findViewById(R.id.extreme);
+        metricsSwitch.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (metricsSwitch.isChecked()) {
+                    radiusBar.setMax(160);
+                    radiusBar.setProgress(50);
+                    radiusTxt.setText("5.0");
+                } else {
+                    radiusBar.setMax(100);
+                    radiusBar.setProgress(30);
+                    radiusTxt.setText("3.0");
+                }
+            }
+        });
         listenerForRatingBar();
         keyWordInput = findViewById(R.id.searchKeyTxt);
         ArrayList<String> keywords = getKeywordsForAutocomplete();
@@ -127,6 +143,7 @@ public class MainActivity extends FragmentActivity {
     }
 
     public void listenerForRadiusBar() {
+        metricsSwitch = findViewById(R.id.metricsSwitch);
         radiusBar = findViewById(R.id.radiusBar);
         radiusTxt = findViewById(R.id.radiusTxt);
         radiusBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -138,7 +155,13 @@ public class MainActivity extends FragmentActivity {
 
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
-
+                if (metricsSwitch.isChecked()) {
+                    radiusBar.setMax(160);
+                    radiusBar.setProgress(50);
+                } else {
+                    radiusBar.setMax(100);
+                    radiusBar.setProgress(30);
+                }
             }
 
             @Override
@@ -170,7 +193,7 @@ public class MainActivity extends FragmentActivity {
 //                                mLastLocation.getLatitude()); // debugPrint purpose
 //                        System.out.println("Last known Location Longitude is " +
 //                                mLastLocation.getLongitude()); // debugPrint purpose
-                        String completeUrl = constructNearbySearchUrl(myLatitude, myLongitude, "restaurant", userRadius * 1.5, userKeyword);
+                        String completeUrl = constructNearbySearchUrl(myLatitude, myLongitude, "restaurant", userRadius * 1.3, userKeyword);
                         System.out.println(completeUrl); // debugPrint purpose
                         RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
                         StringRequest stringRequest = new StringRequest(Request.Method.GET, completeUrl,
@@ -302,7 +325,11 @@ public class MainActivity extends FragmentActivity {
             return false;
         }
         userKeyword = userKeyword.replace(' ', '+');
-        userRadius *= 1000;
+        if (metricsSwitch.isChecked()) {
+            userRadius *= 1000;
+        } else {
+            userRadius *= 1600;
+        }
 //        System.out.println("userRadius: " + userRadius); // debug purpose
         if (cheap.isChecked()) {
             userPrice = 1;
