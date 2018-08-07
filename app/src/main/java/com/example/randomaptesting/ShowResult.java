@@ -39,6 +39,8 @@ import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Random;
 
 public class ShowResult extends AppCompatActivity {
@@ -134,6 +136,16 @@ public class ShowResult extends AppCompatActivity {
             getTheOne();
         } else {
             System.out.println("Should print out the list"); // debug purpose
+            Collections.sort(suggestions, Destination.DistanceComparator);
+            System.out.println("Sorted according to distance"); // debug purpose
+            for (Destination d: suggestions) {
+                System.out.println(d);
+            }
+            Collections.sort(suggestions, Destination.DistanceComparator);
+            System.out.println("Sorted according to distance"); // debug purpose
+            for (Destination d: suggestions) {
+                System.out.println(d);
+            }
         }
 
     }

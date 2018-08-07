@@ -27,6 +27,10 @@ import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.places.GeoDataClient;
+import com.google.android.gms.location.places.Place;
+import com.google.android.gms.location.places.PlaceBufferResponse;
+import com.google.android.gms.location.places.Places;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
@@ -61,6 +65,7 @@ public class MainActivity extends FragmentActivity {
     double userRadius;
     int userPrice;
     double userRating;
+    private String placeUrl;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -95,6 +100,233 @@ public class MainActivity extends FragmentActivity {
         keyWordInput.setAdapter(adapter);
         keyWordInput.setThreshold(1);
     }
+
+    @SuppressWarnings("MissingPermission")
+    private void mainFunc() {
+        if (!returnInputsForURL()) {
+            Toast.makeText(getApplicationContext(), "Please key in a keyword",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        FusedLocationProviderClient mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        mFusedLocationClient.getLastLocation()
+            .addOnCompleteListener(this, new OnCompleteListener<Location>() {
+                @Override
+                public void onComplete(@NonNull Task<Location> task) {
+                    if (task.isSuccessful() && task.getResult() != null) {
+                        Location mLastLocation = task.getResult();
+                        final double myLatitude = mLastLocation.getLatitude();
+                        final double myLongitude = mLastLocation.getLongitude();
+//                        System.out.println("Last known Location Latitude is " +
+//                                mLastLocation.getLatitude()); // debugPrint purpose
+//                        System.out.println("Last known Location Longitude is " +
+//                                mLastLocation.getLongitude()); // debugPrint purpose
+                        String completeUrl = constructNearbySearchUrl(myLatitude, myLongitude, "restaurant", userRadius * 1.3, userKeyword);
+                        System.out.println(completeUrl); // debugPrint purpose
+                        RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
+                        StringRequest stringRequest = new StringRequest(Request.Method.GET, completeUrl,
+                            new Response.Listener<String>() {
+                                @Override
+                                public void onResponse(String response) {
+                                    ArrayList<Destination> destinationList = new ArrayList<>();
+                                    try {
+                                        JSONObject obj = new JSONObject(response);
+                                        JSONArray results = obj.getJSONArray("results");
+                                        for (int i = 0; i < results.length(); i++) {
+                                            String name = results.getJSONObject(i).getString("name");
+                                            String address = results.getJSONObject(i).getString("vicinity");
+                                            String placeId = results.getJSONObject(i).getString("place_id");
+                                            String latitude = results.getJSONObject(i).getJSONObject("geometry")
+                                                    .getJSONObject("location").getString("lat");
+                                            String longitude = results.getJSONObject(i).getJSONObject("geometry")
+                                                    .getJSONObject("location").getString("lng");
+                                            double placeLatitude = Double.parseDouble(latitude);
+                                            double placeLongitude = Double.parseDouble(longitude);
+//                                            System.out.println("placeLatitude: " + placeLatitude); // for debug purpose
+//                                            System.out.println("placeLongitude: " + placeLongitude); // for debug purpose
+                                            double distance = calculateDistance(myLatitude, myLongitude, placeLatitude, placeLongitude) * 1000;
+//                                            System.out.println("Distance:" + distance); // for debug purpose
+                                            Destination d = new Destination(name, address, placeId, distance);
+                                            destinationList.add(d);
+                                            GeoDataClient mGeoDataClient = Places
+                                                    .getGeoDataClient(getApplicationContext(), null);
+                                            mGeoDataClient.getPlaceById(d.getId())
+                                                    .addOnCompleteListener(new OnCompleteListener<PlaceBufferResponse>() {
+                                                        @Override
+                                                        public void onComplete(@NonNull Task<PlaceBufferResponse> task) {
+                                                            if (task.isSuccessful()) {
+                                                                PlaceBufferResponse places = task.getResult();
+                                                                Place myPlace = places.get(0);
+                                                                System.out.println("Place found: " + myPlace.getName()); // debugPrint purpose
+
+                                                                places.release();
+
+                                                            } else {
+                                                                System.out.println("Place not found.");
+                                                            }
+                                                        }
+                                                    });
+                                        }
+                                    } catch (JSONException e) {
+                                        e.printStackTrace();
+                                    }
+                                    System.out.println("Destinations:"); // for debug purpose
+                                    for (int i = 0; i < destinationList.size(); i++) {
+                                        System.out.println(i+1 + ". " + destinationList.get(i));
+                                    }
+
+                                    ArrayList<Destination> matchUserReqList = new ArrayList<>();
+                                    ArrayList<Destination> suggestions = new ArrayList<>();
+
+                                    for (Destination d: destinationList) {
+                                        if (matchUserReq(d)) {
+                                            matchUserReqList.add(d);
+                                        } else {
+                                            suggestions.add(d);
+                                        }
+                                    }
+                                    System.out.println("MatchUserReqList: "); // for debug purpose
+                                    for (int i = 0; i < matchUserReqList.size(); i++) {
+                                        System.out.println(Integer.toString(i+1) + ". " + matchUserReqList.get(i));
+                                    }
+                                    System.out.println("Suggestions: "); // for debug purpose
+                                    for (int i = 0; i < suggestions.size(); i++) {
+                                        System.out.println(Integer.toString(i+1) + ". " + suggestions.get(i));
+                                    }
+                                    Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
+                                    showResultActivity.putExtra("matchUserReqList", matchUserReqList);
+                                    showResultActivity.putExtra("suggestions", suggestions);
+                                    startActivity(showResultActivity);
+                                }
+                            }, new Response.ErrorListener() {
+                            @Override
+                            public void onErrorResponse(VolleyError error) {
+                                System.out.println("Volley Error");
+                            }
+                        }
+                        );
+                        queue.add(stringRequest);
+
+                    } else {
+                        System.out.println("No Last known location found. Try current location..!");
+                    }
+                }
+            });
+    }
+
+    private boolean matchUserReq(Destination d) {
+        if (d.getDistance() > userRadius) {
+            return false;
+        }
+        if (d.getRating() != 0) {
+            if (d.getRating() < userRating) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    private double calculateDistance(double myLatitude, double myLongitude, double placeLatitude, double placeLongitude) {
+        double earthRadius = 6371;
+        double latDiff = degreeToRadians(placeLatitude - myLatitude);
+        double longDiff = degreeToRadians(placeLongitude - myLongitude);
+        double a = Math.pow(Math.sin(latDiff/2), 2)
+                + Math.cos(degreeToRadians(myLatitude)) * Math.cos(degreeToRadians(placeLatitude))
+                * Math.pow(Math.sin(longDiff/2), 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        double d = earthRadius * c;
+        return d;
+    }
+
+    private double degreeToRadians(double degree) {
+        return degree * (Math.PI/180);
+    }
+
+    private boolean returnInputsForURL() {
+        userKeyword = keyWordInput.getText().toString();
+        if (userKeyword.length() == 0) {
+            return false;
+        }
+        userKeyword = userKeyword.replace(' ', '+');
+        if (metricsSwitch.isChecked()) {
+            userRadius *= 1000;
+        } else {
+            userRadius *= 1600;
+        }
+//        System.out.println("userRadius: " + userRadius); // debug purpose
+        if (cheap.isChecked()) {
+            userPrice = 1;
+        } else if (normal.isChecked()) {
+            userPrice = 2;
+        } else if (expensive.isChecked()) {
+            userPrice = 3;
+        } else {
+            userPrice = 4;
+        }
+//        System.out.println("userPrice: " + userPrice); // for debug purpose
+        userRating = ratingBar.getRating();
+        return true;
+    }
+
+    private String constructNearbySearchUrl(double latitude, double longitude,
+                                            String type, double radius, String key) {
+        String basicUrl ="https://maps.googleapis.com/maps/api/place/nearbysearch/json?";
+        String latAndLong = "location=" + Double.toString(latitude) + "," + Double.toString(longitude);
+        String radiusFrCurrentLocation = "&radius=" + radius;
+        String placeType = "&type=" + type;
+        String keyword = "&keyword=" + key + "&opennow=1";
+        String apiKey = "&key=AIzaSyDpKpQ2S8lvUK7xfHGgSoJXy0HG9tFU-7s";
+        String completeUrl = basicUrl + latAndLong + radiusFrCurrentLocation
+                + placeType + keyword + apiKey;
+        return completeUrl;
+    }
+
+
+    private boolean isLocationAccessPermitted() {
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    private void requestLocationAccessPermission() {
+        ActivityCompat.requestPermissions(this,
+                new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                LOC_REQ_CODE);
+    }
+
+    /*
+    * The function below is used for auto complete loading from text file
+    * But we changed plans so it is not used, but it is useful for future
+    * */
+
+    private ArrayList<String> getKeywordsForAutocomplete() {
+        System.out.println("Inside getKeywordsForAutoComplete function"); // for debug purpose
+        ArrayList<String> keywords = new ArrayList<>();
+        InputStream is = getResources().openRawResource(R.raw.keywords);
+        try {
+            BufferedReader br = new BufferedReader(new InputStreamReader(is));
+            String line;
+            while ((line = br.readLine()) != null) {
+                keywords.add(line);
+            }
+            br.close();
+        }
+        catch (IOException e) {
+            System.out.println("Failed to load keywords from text file");
+        }
+        return keywords;
+    }
+
+    /*
+    * The code below are UI elements, it would be changed to the newest design accordingly
+    * So it is not very important, but the way those bars work would be applied later
+    *
+    * */
 
     public void onSubmitClicked(View v) {
         mainFunc();
@@ -172,223 +404,5 @@ public class MainActivity extends FragmentActivity {
                 }
             }
         });
-    }
-
-    @SuppressWarnings("MissingPermission")
-    private void mainFunc() {
-        if (!returnInputsForURL()) {
-            Toast.makeText(getApplicationContext(), "Please key in a keyword",Toast.LENGTH_SHORT).show();
-            return;
-        }
-        FusedLocationProviderClient mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        mFusedLocationClient.getLastLocation()
-            .addOnCompleteListener(this, new OnCompleteListener<Location>() {
-                @Override
-                public void onComplete(@NonNull Task<Location> task) {
-                    if (task.isSuccessful() && task.getResult() != null) {
-                        Location mLastLocation = task.getResult();
-                        final double myLatitude = mLastLocation.getLatitude();
-                        final double myLongitude = mLastLocation.getLongitude();
-//                        System.out.println("Last known Location Latitude is " +
-//                                mLastLocation.getLatitude()); // debugPrint purpose
-//                        System.out.println("Last known Location Longitude is " +
-//                                mLastLocation.getLongitude()); // debugPrint purpose
-                        String completeUrl = constructNearbySearchUrl(myLatitude, myLongitude, "restaurant", userRadius * 1.3, userKeyword);
-                        System.out.println(completeUrl); // debugPrint purpose
-                        RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
-                        StringRequest stringRequest = new StringRequest(Request.Method.GET, completeUrl,
-                            new Response.Listener<String>() {
-                                @Override
-                                public void onResponse(String response) {
-                                    ArrayList<Destination> destinationList = new ArrayList<>();
-                                    try {
-                                        JSONObject obj = new JSONObject(response);
-                                        JSONArray results = obj.getJSONArray("results");
-                                        for (int i = 0; i < results.length(); i++) {
-                                            String name = results.getJSONObject(i).getString("name");
-                                            String address = results.getJSONObject(i).getString("vicinity");
-                                            String placeId = results.getJSONObject(i).getString("place_id");
-                                            String ratingStr = results.getJSONObject(i).getString("rating");
-                                            String priceStr = results.getJSONObject(i).getString("price_level");
-                                            String latitude = results.getJSONObject(i).getJSONObject("geometry")
-                                                    .getJSONObject("location").getString("lat");
-                                            String longitude = results.getJSONObject(i).getJSONObject("geometry")
-                                                    .getJSONObject("location").getString("lng");
-                                            double placeLatitude = Double.parseDouble(latitude);
-                                            double placeLongitude = Double.parseDouble(longitude);
-//                                            System.out.println("placeLatitude: " + placeLatitude); // for debug purpose
-//                                            System.out.println("placeLongitude: " + placeLongitude); // for debug purpose
-                                            double distance = calculateDistance(myLatitude, myLongitude, placeLatitude, placeLongitude) * 1000;
-//                                            System.out.println("Distance:" + distance); // for debug purpose
-                                            if (ratingStr == null) {
-                                                Destination d = new Destination(name, address, placeId, distance);
-                                                destinationList.add(d);
-                                            }
-                                            double rating = Double.parseDouble(ratingStr);
-                                            if (priceStr == null) {
-                                                Destination d = new Destination(name, address, placeId, distance, rating);
-                                                destinationList.add(d);
-                                            }
-                                            int price = Integer.parseInt(priceStr);
-                                            Destination d = new Destination(name, address, placeId, distance, rating, price);
-                                            destinationList.add(d);
-                                        }
-                                    } catch (JSONException e) {
-                                        e.printStackTrace();
-                                    }
-                                    System.out.println("Destinations:"); // for debug purpose
-                                    for (int i = 0; i < destinationList.size(); i++) {
-                                        System.out.println(i+1 + ". " + destinationList.get(i));
-                                    }
-
-                                    ArrayList<Destination> matchUserReqList = new ArrayList<>();
-                                    ArrayList<Destination> suggestions = new ArrayList<>();
-
-                                    for (Destination d: destinationList) {
-                                        if (matchUserReq(d)) {
-                                            matchUserReqList.add(d);
-                                        } else {
-                                            suggestions.add(d);
-                                        }
-                                    }
-                                    System.out.println("MatchUserReqList: "); // for debug purpose
-                                    for (int i = 0; i < matchUserReqList.size(); i++) {
-                                        System.out.println(Integer.toString(i+1) + ". " + matchUserReqList.get(i));
-                                    }
-                                    System.out.println("Suggestions: "); // for debug purpose
-                                    for (int i = 0; i < suggestions.size(); i++) {
-                                        System.out.println(Integer.toString(i+1) + ". " + suggestions.get(i));
-                                    }
-                                    Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
-                                    showResultActivity.putExtra("matchUserReqList", matchUserReqList);
-                                    showResultActivity.putExtra("suggestions", suggestions);
-                                    startActivity(showResultActivity);
-                                }
-                            }, new Response.ErrorListener() {
-                            @Override
-                            public void onErrorResponse(VolleyError error) {
-                                System.out.println("Volley Error");
-                            }
-                        }
-                        );
-                        queue.add(stringRequest);
-
-                    } else {
-                        System.out.println("No Last known location found. Try current location..!");
-                    }
-                }
-            });
-    }
-
-    private boolean matchUserReq(Destination d) {
-        if (d.getDistance() > userRadius) {
-            return false;
-        }
-        if (d.getRating() != 0) {
-            if (d.getRating() < userRating) {
-                return false;
-            }
-        } else {
-            return false;
-        }
-        if (d.getPrice() != 0) {
-            if (d.getPrice() > userPrice) {
-                return false;
-            }
-        } else {
-            return false;
-        }
-
-        return true;
-    }
-
-    private double calculateDistance(double myLatitude, double myLongitude, double placeLatitude, double placeLongitude) {
-        double earthRadius = 6371;
-        double latDiff = degreeToRadians(placeLatitude - myLatitude);
-        double longDiff = degreeToRadians(placeLongitude - myLongitude);
-        double a = Math.pow(Math.sin(latDiff/2), 2)
-                + Math.cos(degreeToRadians(myLatitude)) * Math.cos(degreeToRadians(placeLatitude))
-                * Math.pow(Math.sin(longDiff/2), 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        double d = earthRadius * c;
-        return d;
-    }
-
-    private double degreeToRadians(double degree) {
-        return degree * (Math.PI/180);
-    }
-
-
-    private boolean returnInputsForURL() {
-        userKeyword = keyWordInput.getText().toString();
-        if (userKeyword.length() == 0) {
-            return false;
-        }
-        userKeyword = userKeyword.replace(' ', '+');
-        if (metricsSwitch.isChecked()) {
-            userRadius *= 1000;
-        } else {
-            userRadius *= 1600;
-        }
-//        System.out.println("userRadius: " + userRadius); // debug purpose
-        if (cheap.isChecked()) {
-            userPrice = 1;
-        } else if (normal.isChecked()) {
-            userPrice = 2;
-        } else if (expensive.isChecked()) {
-            userPrice = 3;
-        } else {
-            userPrice = 4;
-        }
-//        System.out.println("userPrice: " + userPrice); // for debug purpose
-        userRating = ratingBar.getRating();
-        return true;
-    }
-
-    private ArrayList<String> getKeywordsForAutocomplete() {
-        System.out.println("Inside getKeywordsForAutoComplete function"); // for debug purpose
-        ArrayList<String> keywords = new ArrayList<>();
-        InputStream is = getResources().openRawResource(R.raw.keywords);
-        try {
-            BufferedReader br = new BufferedReader(new InputStreamReader(is));
-            String line;
-            while ((line = br.readLine()) != null) {
-                keywords.add(line);
-            }
-            br.close();
-        }
-        catch (IOException e) {
-            System.out.println("Failed to load keywords from text file");
-        }
-        return keywords;
-    }
-
-    private String constructNearbySearchUrl(double latitude, double longitude,
-                                            String type, double radius, String key) {
-        String basicUrl ="https://maps.googleapis.com/maps/api/place/nearbysearch/json?";
-        String latAndLong = "location=" + Double.toString(latitude) + "," + Double.toString(longitude);
-        String radiusFrCurrentLocation = "&radius=" + radius;
-        String placeType = "&type=" + type;
-        String keyword = "&keyword=" + key + "&opennow=1";
-        String apiKey = "&key=AIzaSyDpKpQ2S8lvUK7xfHGgSoJXy0HG9tFU-7s";
-        String completeUrl = basicUrl + latAndLong + radiusFrCurrentLocation
-                + placeType + keyword + apiKey;
-        return completeUrl;
-    }
-
-    private boolean isLocationAccessPermitted() {
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-            return false;
-        } else {
-            return true;
-        }
-    }
-
-    private void requestLocationAccessPermission() {
-        ActivityCompat.requestPermissions(this,
-                new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                LOC_REQ_CODE);
     }
 }
