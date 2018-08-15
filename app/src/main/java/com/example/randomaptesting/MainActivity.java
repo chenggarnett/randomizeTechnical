@@ -1,17 +1,28 @@
 package com.example.randomaptesting;
 
 import android.Manifest;
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.ContextCompat;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
+import android.widget.EditText;
 import android.widget.RatingBar;
 import android.widget.SeekBar;
 import android.widget.Switch;
@@ -25,8 +36,16 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResult;
+import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.location.places.GeoDataClient;
 import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.PlaceBufferResponse;
@@ -42,6 +61,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.InetAddress;
 import java.util.ArrayList;
 
 /**
@@ -50,8 +70,7 @@ import java.util.ArrayList;
 
 public class MainActivity extends FragmentActivity {
 
-    private static final int LOC_REQ_CODE = 1;
-    private AutoCompleteTextView keyWordInput;
+    EditText keyWordInput;
     Switch metricsSwitch;
     SeekBar radiusBar;
     TextView radiusTxt;
@@ -65,11 +84,17 @@ public class MainActivity extends FragmentActivity {
     double userRadius;
     int userPrice;
     double userRating;
-    private String placeUrl;
+    boolean includePrice = false;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        if (!isNetworkConnected()) {
+            showDialog();
+        }
+        if (!checkLocationAccessPermitted())  {
+            requestLocationAccessPermission();
+        }
         listenerForRadiusBar();
         cheap = findViewById(R.id.cheap);
         normal = findViewById(R.id.normal);
@@ -91,14 +116,14 @@ public class MainActivity extends FragmentActivity {
         });
         listenerForRatingBar();
         keyWordInput = findViewById(R.id.searchKeyTxt);
-        ArrayList<String> keywords = getKeywordsForAutocomplete();
-//        for (String keyword: keywords) { // for debug purpose
-//            System.out.println("Keyword: " +keyword);
-//        }
-        ArrayAdapter adapter = new
-                ArrayAdapter(this,android.R.layout.simple_list_item_1, keywords);
-        keyWordInput.setAdapter(adapter);
-        keyWordInput.setThreshold(1);
+//        ArrayList<String> keywords = getKeywordsForAutocomplete();
+////        for (String keyword: keywords) { // for debug purpose
+////            System.out.println("Keyword: " +keyword);
+////        }
+//        ArrayAdapter adapter = new
+//                ArrayAdapter(this,android.R.layout.simple_list_item_1, keywords);
+//        keyWordInput.setAdapter(adapter);
+//        keyWordInput.setThreshold(1);
     }
 
     @SuppressWarnings("MissingPermission")
@@ -132,9 +157,6 @@ public class MainActivity extends FragmentActivity {
                                         JSONObject obj = new JSONObject(response);
                                         JSONArray results = obj.getJSONArray("results");
                                         for (int i = 0; i < results.length(); i++) {
-                                            String name = results.getJSONObject(i).getString("name");
-                                            String address = results.getJSONObject(i).getString("vicinity");
-                                            String placeId = results.getJSONObject(i).getString("place_id");
                                             String latitude = results.getJSONObject(i).getJSONObject("geometry")
                                                     .getJSONObject("location").getString("lat");
                                             String longitude = results.getJSONObject(i).getJSONObject("geometry")
@@ -145,26 +167,24 @@ public class MainActivity extends FragmentActivity {
 //                                            System.out.println("placeLongitude: " + placeLongitude); // for debug purpose
                                             double distance = calculateDistance(myLatitude, myLongitude, placeLatitude, placeLongitude) * 1000;
 //                                            System.out.println("Distance:" + distance); // for debug purpose
+                                            String name = results.getJSONObject(i).getString("name");
+                                            String placeId = results.getJSONObject(i).getString("place_id");
+                                            String address = results.getJSONObject(i).getString("vicinity");
+                                            int price = 0;
+                                            if (results.getJSONObject(i).has("price_level")) {
+                                                includePrice = true;
+                                                String price_level = results.getJSONObject(i).getString("price_level");
+                                                price = Integer.parseInt(price_level);
+                                            }
+                                            double rating = 0;
+                                            if (results.getJSONObject(i).has("rating")) {
+                                                String r = results.getJSONObject(i).getString("rating");
+                                                rating = Double.parseDouble(r);
+                                            }
                                             Destination d = new Destination(name, address, placeId, distance);
+                                            d.setPrice(price);
+                                            d.setRating(rating);
                                             destinationList.add(d);
-                                            GeoDataClient mGeoDataClient = Places
-                                                    .getGeoDataClient(getApplicationContext(), null);
-                                            mGeoDataClient.getPlaceById(d.getId())
-                                                    .addOnCompleteListener(new OnCompleteListener<PlaceBufferResponse>() {
-                                                        @Override
-                                                        public void onComplete(@NonNull Task<PlaceBufferResponse> task) {
-                                                            if (task.isSuccessful()) {
-                                                                PlaceBufferResponse places = task.getResult();
-                                                                Place myPlace = places.get(0);
-                                                                System.out.println("Place found: " + myPlace.getName()); // debugPrint purpose
-
-                                                                places.release();
-
-                                                            } else {
-                                                                System.out.println("Place not found.");
-                                                            }
-                                                        }
-                                                    });
                                         }
                                     } catch (JSONException e) {
                                         e.printStackTrace();
@@ -178,7 +198,7 @@ public class MainActivity extends FragmentActivity {
                                     ArrayList<Destination> suggestions = new ArrayList<>();
 
                                     for (Destination d: destinationList) {
-                                        if (matchUserReq(d)) {
+                                        if (matchUserReq(d, includePrice)) {
                                             matchUserReqList.add(d);
                                         } else {
                                             suggestions.add(d);
@@ -213,7 +233,7 @@ public class MainActivity extends FragmentActivity {
             });
     }
 
-    private boolean matchUserReq(Destination d) {
+    private boolean matchUserReq(Destination d, boolean includePrice) {
         if (d.getDistance() > userRadius) {
             return false;
         }
@@ -224,6 +244,12 @@ public class MainActivity extends FragmentActivity {
         } else {
             return false;
         }
+        if (includePrice == true) {
+            if (d.getPrice() > userPrice) {
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -282,51 +308,114 @@ public class MainActivity extends FragmentActivity {
         return completeUrl;
     }
 
+    /*
+    * The two functions below are used to check if there is Wifi or data connection
+    * If not, prompt user to open Wifi
+    * */
 
-    private boolean isLocationAccessPermitted() {
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-            return false;
-        } else {
-            return true;
+    private boolean isNetworkConnected() {
+        boolean haveConnectedWifi = false;
+        boolean haveConnectedMobile = false;
+
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(getApplicationContext().CONNECTIVITY_SERVICE);
+        NetworkInfo[] netInfo = cm.getAllNetworkInfo();
+        for (NetworkInfo ni : netInfo) {
+            if (ni.getTypeName().equalsIgnoreCase("WIFI"))
+                if (ni.isConnected())
+                    haveConnectedWifi = true;
+            if (ni.getTypeName().equalsIgnoreCase("MOBILE"))
+                if (ni.isConnected())
+                    haveConnectedMobile = true;
+        }
+        return haveConnectedWifi || haveConnectedMobile;
+    }
+
+    private void showDialog()
+    {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setMessage("Connect to wifi or quit")
+                .setCancelable(false)
+                .setPositiveButton("Connect to WIFI", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS));
+                    }
+                })
+                .setNegativeButton("Quit", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        finishActivity(0);
+                    }
+                });
+        AlertDialog alert = builder.create();
+        alert.show();
+    }
+
+    /*
+    * The below two functions are used to check if the user has enabled location services
+    * and prompt them to open it if it is not enabled
+    * */
+
+
+    private boolean checkLocationAccessPermitted() {
+        int locationMode = 0;
+        String locationProviders;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT){
+            try {
+                locationMode = Settings.Secure.getInt(getApplicationContext().getContentResolver(), Settings.Secure.LOCATION_MODE);
+
+            } catch (Settings.SettingNotFoundException e) {
+                e.printStackTrace();
+                return false;
+            }
+
+            return locationMode != Settings.Secure.LOCATION_MODE_OFF;
+
+        }else{
+            locationProviders = Settings.Secure.getString(getApplicationContext().getContentResolver(), Settings.Secure.LOCATION_PROVIDERS_ALLOWED);
+            return !TextUtils.isEmpty(locationProviders);
         }
     }
 
     private void requestLocationAccessPermission() {
-        ActivityCompat.requestPermissions(this,
-                new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                LOC_REQ_CODE);
-    }
+        GoogleApiClient googleApiClient = new GoogleApiClient.Builder(getApplicationContext())
+                .addApi(LocationServices.API).build();
+        googleApiClient.connect();
 
-    /*
-    * The function below is used for auto complete loading from text file
-    * But we changed plans so it is not used, but it is useful for future
-    * */
+        LocationRequest locationRequest = LocationRequest.create();
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        locationRequest.setInterval(10000);
+        locationRequest.setFastestInterval(10000 / 2);
 
-    private ArrayList<String> getKeywordsForAutocomplete() {
-        System.out.println("Inside getKeywordsForAutoComplete function"); // for debug purpose
-        ArrayList<String> keywords = new ArrayList<>();
-        InputStream is = getResources().openRawResource(R.raw.keywords);
-        try {
-            BufferedReader br = new BufferedReader(new InputStreamReader(is));
-            String line;
-            while ((line = br.readLine()) != null) {
-                keywords.add(line);
+        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder().addLocationRequest(locationRequest);
+        builder.setAlwaysShow(true);
+
+        PendingResult<LocationSettingsResult> result = LocationServices.SettingsApi.checkLocationSettings(googleApiClient, builder.build());
+        result.setResultCallback(new ResultCallback<LocationSettingsResult>() {
+            @Override
+            public void onResult(LocationSettingsResult result) {
+                final Status status = result.getStatus();
+                switch (status.getStatusCode()) {
+                    case LocationSettingsStatusCodes.SUCCESS:
+                        System.out.println("All location settings are satisfied.");
+                        break;
+                    case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
+                        System.out.println("Location settings are not satisfied. Show the user a dialog to upgrade location settings ");
+
+                        try {
+                            // Show the dialog by calling startResolutionForResult(), and check the result
+                            // in onActivityResult().
+                            status.startResolutionForResult(MainActivity.this, 1);
+                        } catch (IntentSender.SendIntentException e) {
+                            System.out.println("PendingIntent unable to execute request.");
+                        }
+                        break;
+                    case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
+                        System.out.println("Location settings are inadequate, and cannot be fixed here. Dialog not created.");
+                        break;
+                }
             }
-            br.close();
-        }
-        catch (IOException e) {
-            System.out.println("Failed to load keywords from text file");
-        }
-        return keywords;
+        });
     }
-
-    /*
-    * The code below are UI elements, it would be changed to the newest design accordingly
-    * So it is not very important, but the way those bars work would be applied later
-    *
-    * */
 
     public void onSubmitClicked(View v) {
         mainFunc();
@@ -359,6 +448,12 @@ public class MainActivity extends FragmentActivity {
         expensive.setChecked(false);
         extreme.setChecked(true);
     }
+
+    /*
+     * The code below are UI elements, it would be changed to the newest design accordingly
+     * So it is not very important, but the way those bars work would be applied later
+     *
+     * */
 
     public void listenerForRatingBar() {
         ratingBar = findViewById(R.id.ratingBar);
@@ -405,4 +500,27 @@ public class MainActivity extends FragmentActivity {
             }
         });
     }
+
+    /*
+     * The function below is used for auto complete loading from text file
+     * But we changed plans so it is not used, but it is useful for future
+     * */
+
+//    private ArrayList<String> getKeywordsForAutocomplete() {
+//        System.out.println("Inside getKeywordsForAutoComplete function"); // for debug purpose
+//        ArrayList<String> keywords = new ArrayList<>();
+//        InputStream is = getResources().openRawResource(R.raw.keywords);
+//        try {
+//            BufferedReader br = new BufferedReader(new InputStreamReader(is));
+//            String line;
+//            while ((line = br.readLine()) != null) {
+//                keywords.add(line);
+//            }
+//            br.close();
+//        }
+//        catch (IOException e) {
+//            System.out.println("Failed to load keywords from text file");
+//        }
+//        return keywords;
+//    }
 }

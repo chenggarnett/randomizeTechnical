@@ -53,6 +53,7 @@ public class ShowResult extends AppCompatActivity {
     private int randNo;
     private int shuffleCount = 0;
     TextView showName;
+    String phoneNumber;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -93,14 +94,14 @@ public class ShowResult extends AppCompatActivity {
                             PlaceBufferResponse places = task.getResult();
                             Place myPlace = places.get(0);
                             System.out.println("Place found: " + myPlace.getName()); // debugPrint purpose
-                            latAndLong = myPlace.getLatLng().toString();
-                            latAndLong = latAndLong.substring(10, latAndLong.length() - 1);
-                            System.out.println("Lat and Long: " + latAndLong); // for debug purpose
-                            showName.setClickable(false);
+//                            latAndLong = myPlace.getLatLng().toString();
+//                            latAndLong = latAndLong.substring(10, latAndLong.length() - 1);
+//                            System.out.println("Lat and Long: " + latAndLong); // for debug purpose
+//                            showName.setClickable(false);
                             if (myPlace.getWebsiteUri() != null) {
-                                placeUrl = myPlace.getWebsiteUri().toString();
-//                                System.out.println("Place URL is " + placeUrl); // for debug purpose
-                                showName.setClickable(true);
+//                                placeUrl = myPlace.getWebsiteUri().toString();
+////                                System.out.println("Place URL is " + placeUrl); // for debug purpose
+//                                showName.setClickable(true);
                             } else {
                                 Toast.makeText(getApplicationContext(), "No website for this place", Toast.LENGTH_SHORT).show();
                             }
@@ -119,8 +120,14 @@ public class ShowResult extends AppCompatActivity {
         TextView showNoOfResults = findViewById(R.id.showNoOfResultsTxt);
         TextView showRating = findViewById(R.id.showRatingTxt);
         showName.setText(myPlace.getName());
-        showAddress.setText(myPlace.getAddress());
-        showRating.setText("Rating: " + myPlace.getRating());
+        if (myPlace.getWebsiteUri() != null) {
+            showAddress.setText(myPlace.getWebsiteUri().toString());
+        }
+        if (myPlace.getPhoneNumber() != null) {
+            showRating.setText("Phone number: " + myPlace.getPhoneNumber());
+            phoneNumber = myPlace.getPhoneNumber().toString();
+        }
+
         showNoOfResults.setText("No of results: " + matchUserReqList.size());
     }
 
@@ -170,6 +177,12 @@ public class ShowResult extends AppCompatActivity {
         String completeUrl = basicUrl + placeName + "+restaurant+" + placeAddress;
         Uri uri = Uri.parse(completeUrl);
         Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+        startActivity(intent);
+    }
+
+    public void onPhoneClicked(View v) {
+        System.out.println("Inside onPhoneClicked function"); // for debug purpose
+        Intent intent = new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + phoneNumber));
         startActivity(intent);
     }
 

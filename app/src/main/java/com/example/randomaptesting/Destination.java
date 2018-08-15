@@ -89,7 +89,7 @@ public class Destination implements Serializable, Comparable<Destination> {
         return "Name: " + name + "\n"
                 + "Address: " + address + "\n"
                 + "Place ID: " + id + "\n"
-                + "Distance: " + distance + "\n"
+                + "Distance: " + distance + "meters" + "\n"
                 + "Rating: " + rating +"\n"
                 + "Price Level: " + price +"\n"
                 + "Telephone No: " + telNo +"\n"
