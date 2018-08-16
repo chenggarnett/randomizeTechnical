@@ -22,6 +22,7 @@ import android.text.TextUtils;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.RatingBar;
 import android.widget.SeekBar;
@@ -78,6 +79,7 @@ public class MainActivity extends FragmentActivity {
     ToggleButton normal;
     ToggleButton expensive;
     ToggleButton extreme;
+    Button nearbyBtn;
     RatingBar ratingBar;
     TextView ratingTxt;
     String userKeyword;
@@ -116,6 +118,8 @@ public class MainActivity extends FragmentActivity {
         });
         listenerForRatingBar();
         keyWordInput = findViewById(R.id.searchKeyTxt);
+        nearbyBtn = findViewById(R.id.nearbyBtn);
+        nearbyBtn.setVisibility(View.INVISIBLE);
 //        ArrayList<String> keywords = getKeywordsForAutocomplete();
 ////        for (String keyword: keywords) { // for debug purpose
 ////            System.out.println("Keyword: " +keyword);
@@ -124,6 +128,10 @@ public class MainActivity extends FragmentActivity {
 //                ArrayAdapter(this,android.R.layout.simple_list_item_1, keywords);
 //        keyWordInput.setAdapter(adapter);
 //        keyWordInput.setThreshold(1);
+    }
+
+    public void onSubmitClicked(View v) {
+        mainFunc();
     }
 
     @SuppressWarnings("MissingPermission")
@@ -145,92 +153,108 @@ public class MainActivity extends FragmentActivity {
 //                                mLastLocation.getLatitude()); // debugPrint purpose
 //                        System.out.println("Last known Location Longitude is " +
 //                                mLastLocation.getLongitude()); // debugPrint purpose
-                        String completeUrl = constructNearbySearchUrl(myLatitude, myLongitude, "restaurant", userRadius * 1.3, userKeyword);
-                        System.out.println(completeUrl); // debugPrint purpose
-                        RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
-                        StringRequest stringRequest = new StringRequest(Request.Method.GET, completeUrl,
-                            new Response.Listener<String>() {
-                                @Override
-                                public void onResponse(String response) {
-                                    ArrayList<Destination> destinationList = new ArrayList<>();
-                                    try {
-                                        JSONObject obj = new JSONObject(response);
-                                        JSONArray results = obj.getJSONArray("results");
-                                        for (int i = 0; i < results.length(); i++) {
-                                            String latitude = results.getJSONObject(i).getJSONObject("geometry")
-                                                    .getJSONObject("location").getString("lat");
-                                            String longitude = results.getJSONObject(i).getJSONObject("geometry")
-                                                    .getJSONObject("location").getString("lng");
-                                            double placeLatitude = Double.parseDouble(latitude);
-                                            double placeLongitude = Double.parseDouble(longitude);
-//                                            System.out.println("placeLatitude: " + placeLatitude); // for debug purpose
-//                                            System.out.println("placeLongitude: " + placeLongitude); // for debug purpose
-                                            double distance = calculateDistance(myLatitude, myLongitude, placeLatitude, placeLongitude) * 1000;
-//                                            System.out.println("Distance:" + distance); // for debug purpose
-                                            String name = results.getJSONObject(i).getString("name");
-                                            String placeId = results.getJSONObject(i).getString("place_id");
-                                            String address = results.getJSONObject(i).getString("vicinity");
-                                            int price = 0;
-                                            if (results.getJSONObject(i).has("price_level")) {
-                                                includePrice = true;
-                                                String price_level = results.getJSONObject(i).getString("price_level");
-                                                price = Integer.parseInt(price_level);
-                                            }
-                                            double rating = 0;
-                                            if (results.getJSONObject(i).has("rating")) {
-                                                String r = results.getJSONObject(i).getString("rating");
-                                                rating = Double.parseDouble(r);
-                                            }
-                                            Destination d = new Destination(name, address, placeId, distance);
-                                            d.setPrice(price);
-                                            d.setRating(rating);
-                                            destinationList.add(d);
-                                        }
-                                    } catch (JSONException e) {
-                                        e.printStackTrace();
-                                    }
-                                    System.out.println("Destinations:"); // for debug purpose
-                                    for (int i = 0; i < destinationList.size(); i++) {
-                                        System.out.println(i+1 + ". " + destinationList.get(i));
-                                    }
-
-                                    ArrayList<Destination> matchUserReqList = new ArrayList<>();
-                                    ArrayList<Destination> suggestions = new ArrayList<>();
-
-                                    for (Destination d: destinationList) {
-                                        if (matchUserReq(d, includePrice)) {
-                                            matchUserReqList.add(d);
-                                        } else {
-                                            suggestions.add(d);
-                                        }
-                                    }
-                                    System.out.println("MatchUserReqList: "); // for debug purpose
-                                    for (int i = 0; i < matchUserReqList.size(); i++) {
-                                        System.out.println(Integer.toString(i+1) + ". " + matchUserReqList.get(i));
-                                    }
-                                    System.out.println("Suggestions: "); // for debug purpose
-                                    for (int i = 0; i < suggestions.size(); i++) {
-                                        System.out.println(Integer.toString(i+1) + ". " + suggestions.get(i));
-                                    }
-                                    Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
-                                    showResultActivity.putExtra("matchUserReqList", matchUserReqList);
-                                    showResultActivity.putExtra("suggestions", suggestions);
-                                    startActivity(showResultActivity);
-                                }
-                            }, new Response.ErrorListener() {
-                            @Override
-                            public void onErrorResponse(VolleyError error) {
-                                System.out.println("Volley Error");
-                            }
-                        }
-                        );
-                        queue.add(stringRequest);
-
+                        callGoogleMapsApi(myLatitude, myLongitude);
                     } else {
                         System.out.println("No Last known location found. Try current location..!");
                     }
                 }
             });
+    }
+
+    public void onNearbyClicked(View v) {
+        userKeyword = "food";
+        mainFunc();
+    }
+
+    public void callGoogleMapsApi(final double myLatitude, final double myLongitude) {
+        String completeUrl = constructNearbySearchUrl(myLatitude, myLongitude, "restaurant", userRadius * 1.3, userKeyword);
+        System.out.println(completeUrl); // debugPrint purpose
+        RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
+        StringRequest stringRequest = new StringRequest(Request.Method.GET, completeUrl,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        ArrayList<Destination> destinationList = new ArrayList<>();
+                        try {
+                            JSONObject obj = new JSONObject(response);
+                            JSONArray results = obj.getJSONArray("results");
+                            if (results.length() == 0) {
+                                Toast.makeText(getApplicationContext(), "There is no nearby" + " \"" + userKeyword + "\" " +  "restaurants", Toast.LENGTH_SHORT).show();
+                                nearbyBtn.setVisibility(View.VISIBLE);
+                                return;
+                            }
+                            for (int i = 0; i < results.length(); i++) {
+                                String latitude = results.getJSONObject(i).getJSONObject("geometry")
+                                        .getJSONObject("location").getString("lat");
+                                String longitude = results.getJSONObject(i).getJSONObject("geometry")
+                                        .getJSONObject("location").getString("lng");
+                                double placeLatitude = Double.parseDouble(latitude);
+                                double placeLongitude = Double.parseDouble(longitude);
+//                                System.out.println("placeLatitude: " + placeLatitude); // for debug purpose
+//                                System.out.println("placeLongitude: " + placeLongitude); // for debug purpose
+                                double distance = calculateDistance(myLatitude, myLongitude, placeLatitude, placeLongitude) * 1000;
+//                                System.out.println("Distance:" + distance); // for debug purpose
+                                String name = results.getJSONObject(i).getString("name");
+                                String placeId = results.getJSONObject(i).getString("place_id");
+                                String address = results.getJSONObject(i).getString("vicinity");
+                                int price = 0;
+                                if (results.getJSONObject(i).has("price_level")) {
+                                    includePrice = true;
+                                    String price_level = results.getJSONObject(i).getString("price_level");
+                                    price = Integer.parseInt(price_level);
+                                }
+                                double rating = 0;
+                                if (results.getJSONObject(i).has("rating")) {
+                                    String r = results.getJSONObject(i).getString("rating");
+                                    rating = Double.parseDouble(r);
+                                }
+                                Destination d = new Destination(name, address, placeId, distance);
+                                d.setPrice(price);
+                                d.setRating(rating);
+                                destinationList.add(d);
+                            }
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                        if (!includePrice) {
+                            Toast.makeText(getApplicationContext(), "All nearby restaurants do not have price", Toast.LENGTH_SHORT).show();
+                        }
+                        System.out.println("Destinations:"); // for debug purpose
+                        for (int i = 0; i < destinationList.size(); i++) {
+                            System.out.println(i+1 + ". " + destinationList.get(i));
+                        }
+
+                        ArrayList<Destination> matchUserReqList = new ArrayList<>();
+                        ArrayList<Destination> suggestions = new ArrayList<>();
+
+                        for (Destination d: destinationList) {
+                            if (matchUserReq(d, includePrice)) {
+                                matchUserReqList.add(d);
+                            } else {
+                                suggestions.add(d);
+                            }
+                        }
+                        System.out.println("MatchUserReqList: "); // for debug purpose
+                        for (int i = 0; i < matchUserReqList.size(); i++) {
+                            System.out.println(Integer.toString(i+1) + ". " + matchUserReqList.get(i));
+                        }
+                        System.out.println("Suggestions: "); // for debug purpose
+                        for (int i = 0; i < suggestions.size(); i++) {
+                            System.out.println(Integer.toString(i+1) + ". " + suggestions.get(i));
+                        }
+                        Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
+                        showResultActivity.putExtra("matchUserReqList", matchUserReqList);
+                        showResultActivity.putExtra("suggestions", suggestions);
+                        startActivity(showResultActivity);
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                System.out.println("Volley Error");
+            }
+        }
+        );
+        queue.add(stringRequest);
     }
 
     private boolean matchUserReq(Destination d, boolean includePrice) {
@@ -244,7 +268,7 @@ public class MainActivity extends FragmentActivity {
         } else {
             return false;
         }
-        if (includePrice == true) {
+        if (includePrice) {
             if (d.getPrice() > userPrice) {
                 return false;
             }
@@ -415,10 +439,6 @@ public class MainActivity extends FragmentActivity {
                 }
             }
         });
-    }
-
-    public void onSubmitClicked(View v) {
-        mainFunc();
     }
 
     public void onCheapClicked(View v) {

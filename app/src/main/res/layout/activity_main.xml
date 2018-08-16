@@ -159,13 +159,26 @@
         android:id="@+id/submitBtn"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="8dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="20dp"
+        android:layout_marginStart="148dp"
+        android:layout_marginTop="28dp"
         android:onClick="onSubmitClicked"
         android:text="submit"
-        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/ratingTxt" />
+
+    <Button
+        android:id="@+id/nearbyBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="28dp"
+        android:onClick="onNearbyClicked"
+        android:text="Nearby"
+        android:visibility="visible"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.454"
+        app:layout_constraintStart_toEndOf="@+id/submitBtn"
         app:layout_constraintTop_toBottomOf="@+id/ratingTxt" />
 
 </android.support.constraint.ConstraintLayout>
