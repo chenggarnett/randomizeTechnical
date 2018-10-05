@@ -3,9 +3,11 @@ package com.example.randomaptesting;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
@@ -53,6 +55,8 @@ import com.google.android.gms.location.places.PlaceBufferResponse;
 import com.google.android.gms.location.places.Places;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -62,8 +66,11 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Type;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Set;
+import java.util.Stack;
 
 /**
  * Created by chengchinlim on 5/29/18.
@@ -71,22 +78,12 @@ import java.util.ArrayList;
 
 public class MainActivity extends FragmentActivity {
 
-    EditText keyWordInput;
-    Switch metricsSwitch;
-    SeekBar radiusBar;
-    TextView radiusTxt;
-    ToggleButton cheap;
-    ToggleButton normal;
-    ToggleButton expensive;
-    ToggleButton extreme;
-    Button nearbyBtn;
-    RatingBar ratingBar;
-    TextView ratingTxt;
     String userKeyword;
     double userRadius;
     int userPrice;
     double userRating;
     boolean includePrice = false;
+//    SharedPreferences sharedPref = getSharedPreferences("previousDestination", Context.MODE_PRIVATE);
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -97,49 +94,11 @@ public class MainActivity extends FragmentActivity {
         if (!checkLocationAccessPermitted())  {
             requestLocationAccessPermission();
         }
-        listenerForRadiusBar();
-        cheap = findViewById(R.id.cheap);
-        normal = findViewById(R.id.normal);
-        expensive = findViewById(R.id.expensive);
-        extreme = findViewById(R.id.extreme);
-        metricsSwitch.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (metricsSwitch.isChecked()) {
-                    radiusBar.setMax(160);
-                    radiusBar.setProgress(50);
-                    radiusTxt.setText("5.0");
-                } else {
-                    radiusBar.setMax(100);
-                    radiusBar.setProgress(30);
-                    radiusTxt.setText("3.0");
-                }
-            }
-        });
-        listenerForRatingBar();
-        keyWordInput = findViewById(R.id.searchKeyTxt);
-        nearbyBtn = findViewById(R.id.nearbyBtn);
-        nearbyBtn.setVisibility(View.INVISIBLE);
-//        ArrayList<String> keywords = getKeywordsForAutocomplete();
-////        for (String keyword: keywords) { // for debug purpose
-////            System.out.println("Keyword: " +keyword);
-////        }
-//        ArrayAdapter adapter = new
-//                ArrayAdapter(this,android.R.layout.simple_list_item_1, keywords);
-//        keyWordInput.setAdapter(adapter);
-//        keyWordInput.setThreshold(1);
-    }
-
-    public void onSubmitClicked(View v) {
         mainFunc();
     }
 
     @SuppressWarnings("MissingPermission")
     private void mainFunc() {
-        if (!returnInputsForURL()) {
-            Toast.makeText(getApplicationContext(), "Please key in a keyword",Toast.LENGTH_SHORT).show();
-            return;
-        }
         FusedLocationProviderClient mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         mFusedLocationClient.getLastLocation()
             .addOnCompleteListener(this, new OnCompleteListener<Location>() {
@@ -161,11 +120,6 @@ public class MainActivity extends FragmentActivity {
             });
     }
 
-    public void onNearbyClicked(View v) {
-        userKeyword = "food";
-        mainFunc();
-    }
-
     public void callGoogleMapsApi(final double myLatitude, final double myLongitude) {
         String completeUrl = constructNearbySearchUrl(myLatitude, myLongitude, "restaurant", userRadius * 1.3, userKeyword);
         System.out.println(completeUrl); // debugPrint purpose
@@ -180,7 +134,6 @@ public class MainActivity extends FragmentActivity {
                             JSONArray results = obj.getJSONArray("results");
                             if (results.length() == 0) {
                                 Toast.makeText(getApplicationContext(), "There is no nearby" + " \"" + userKeyword + "\" " +  "restaurants", Toast.LENGTH_SHORT).show();
-                                nearbyBtn.setVisibility(View.VISIBLE);
                                 return;
                             }
                             for (int i = 0; i < results.length(); i++) {
@@ -277,6 +230,23 @@ public class MainActivity extends FragmentActivity {
         return true;
     }
 
+//    private void savePreviousDestination(ArrayList<Destination> prevDestination) {
+//
+//        SharedPreferences.Editor editor = sharedPref.edit();
+//        Gson gson = new Gson();
+//        String json = gson.toJson(prevDestination);
+//        editor.putString("prevDestination", json);
+//        editor.commit();
+//    }
+//
+//    private ArrayList<Destination> retrievePreviousDestinations() {
+//        Gson gson = new Gson();
+//        String json = sharedPref.getString("prevDestination", "");
+//        Type type = new TypeToken<ArrayList<Destination>>() {}.getType();
+//        ArrayList<Destination> destinations = gson.fromJson(json, type);
+//        return destinations;
+//    }
+
     private double calculateDistance(double myLatitude, double myLongitude, double placeLatitude, double placeLongitude) {
         double earthRadius = 6371;
         double latDiff = degreeToRadians(placeLatitude - myLatitude);
@@ -291,32 +261,6 @@ public class MainActivity extends FragmentActivity {
 
     private double degreeToRadians(double degree) {
         return degree * (Math.PI/180);
-    }
-
-    private boolean returnInputsForURL() {
-        userKeyword = keyWordInput.getText().toString();
-        if (userKeyword.length() == 0) {
-            return false;
-        }
-        userKeyword = userKeyword.replace(' ', '+');
-        if (metricsSwitch.isChecked()) {
-            userRadius *= 1000;
-        } else {
-            userRadius *= 1600;
-        }
-//        System.out.println("userRadius: " + userRadius); // debug purpose
-        if (cheap.isChecked()) {
-            userPrice = 1;
-        } else if (normal.isChecked()) {
-            userPrice = 2;
-        } else if (expensive.isChecked()) {
-            userPrice = 3;
-        } else {
-            userPrice = 4;
-        }
-//        System.out.println("userPrice: " + userPrice); // for debug purpose
-        userRating = ratingBar.getRating();
-        return true;
     }
 
     private String constructNearbySearchUrl(double latitude, double longitude,
@@ -377,7 +321,6 @@ public class MainActivity extends FragmentActivity {
     * The below two functions are used to check if the user has enabled location services
     * and prompt them to open it if it is not enabled
     * */
-
 
     private boolean checkLocationAccessPermitted() {
         int locationMode = 0;
@@ -441,85 +384,57 @@ public class MainActivity extends FragmentActivity {
         });
     }
 
-    public void onCheapClicked(View v) {
-        cheap.setChecked(true);
-        normal.setChecked(false);
-        expensive.setChecked(false);
-        extreme.setChecked(false);
-    }
-
-    public void onNormalClicked(View v) {
-        cheap.setChecked(false);
-        normal.setChecked(true);
-        expensive.setChecked(false);
-        extreme.setChecked(false);
-    }
-
-    public void onExpensiveClicked(View v) {
-        cheap.setChecked(false);
-        normal.setChecked(false);
-        expensive.setChecked(true);
-        extreme.setChecked(false);
-    }
-
-    public void onExtremeClicked(View v) {
-        cheap.setChecked(false);
-        normal.setChecked(false);
-        expensive.setChecked(false);
-        extreme.setChecked(true);
-    }
-
     /*
      * The code below are UI elements, it would be changed to the newest design accordingly
      * So it is not very important, but the way those bars work would be applied later
      *
      * */
 
-    public void listenerForRatingBar() {
-        ratingBar = findViewById(R.id.ratingBar);
-        ratingTxt = findViewById(R.id.ratingTxt);
-        ratingBar.setOnRatingBarChangeListener(new RatingBar.OnRatingBarChangeListener() {
-            @Override
-            public void onRatingChanged(RatingBar ratingBar, float rating, boolean fromUser) {
-                ratingTxt.setText(Float.toString(rating));
-                if (rating < 1.0f) {
-                    ratingBar.setRating(1.0f);
-                }
-            }
-        });
-    }
+//    public void listenerForRatingBar() {
+//        ratingBar = findViewById(R.id.ratingBar);
+//        ratingTxt = findViewById(R.id.ratingTxt);
+//        ratingBar.setOnRatingBarChangeListener(new RatingBar.OnRatingBarChangeListener() {
+//            @Override
+//            public void onRatingChanged(RatingBar ratingBar, float rating, boolean fromUser) {
+//                ratingTxt.setText(Float.toString(rating));
+//                if (rating < 1.0f) {
+//                    ratingBar.setRating(1.0f);
+//                }
+//            }
+//        });
+//    }
 
-    public void listenerForRadiusBar() {
-        metricsSwitch = findViewById(R.id.metricsSwitch);
-        radiusBar = findViewById(R.id.radiusBar);
-        radiusTxt = findViewById(R.id.radiusTxt);
-        radiusBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                userRadius = ((double)progress/10);
-                radiusTxt.setText(Double.toString(userRadius));
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-                if (metricsSwitch.isChecked()) {
-                    radiusBar.setMax(160);
-                    radiusBar.setProgress(50);
-                } else {
-                    radiusBar.setMax(100);
-                    radiusBar.setProgress(30);
-                }
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                if (userRadius < 1) {
-                    Toast.makeText(getApplicationContext(), "Minimum is 1, radius will be set to 1", Toast.LENGTH_SHORT).show();
-                    userRadius = 1;
-                }
-            }
-        });
-    }
+//    public void listenerForRadiusBar() {
+//        metricsSwitch = findViewById(R.id.metricsSwitch);
+//        radiusBar = findViewById(R.id.radiusBar);
+//        radiusTxt = findViewById(R.id.radiusTxt);
+//        radiusBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+//            @Override
+//            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+//                userRadius = ((double)progress/10);
+//                radiusTxt.setText(Double.toString(userRadius));
+//            }
+//
+//            @Override
+//            public void onStartTrackingTouch(SeekBar seekBar) {
+//                if (metricsSwitch.isChecked()) {
+//                    radiusBar.setMax(160);
+//                    radiusBar.setProgress(50);
+//                } else {
+//                    radiusBar.setMax(100);
+//                    radiusBar.setProgress(30);
+//                }
+//            }
+//
+//            @Override
+//            public void onStopTrackingTouch(SeekBar seekBar) {
+//                if (userRadius < 1) {
+//                    Toast.makeText(getApplicationContext(), "Minimum is 1, radius will be set to 1", Toast.LENGTH_SHORT).show();
+//                    userRadius = 1;
+//                }
+//            }
+//        });
+//    }
 
     /*
      * The function below is used for auto complete loading from text file

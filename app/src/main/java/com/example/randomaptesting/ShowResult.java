@@ -68,7 +68,7 @@ public class ShowResult extends AppCompatActivity {
     }
 
     private void getTheOne() {
-//        debugPrint(destinationList); // for debug purpose
+//        debugPrint(destinationList); // debug purpose
         if (matchUserReqList.size() == 0) {
             Toast.makeText(this,"0 results", Toast.LENGTH_LONG).show();
             shuffleBtn.setText("list");
@@ -96,11 +96,11 @@ public class ShowResult extends AppCompatActivity {
                             System.out.println("Place found: " + myPlace.getName()); // debugPrint purpose
 //                            latAndLong = myPlace.getLatLng().toString();
 //                            latAndLong = latAndLong.substring(10, latAndLong.length() - 1);
-//                            System.out.println("Lat and Long: " + latAndLong); // for debug purpose
+//                            System.out.println("Lat and Long: " + latAndLong); // debug purpose
 //                            showName.setClickable(false);
                             if (myPlace.getWebsiteUri() != null) {
 //                                placeUrl = myPlace.getWebsiteUri().toString();
-////                                System.out.println("Place URL is " + placeUrl); // for debug purpose
+////                                System.out.println("Place URL is " + placeUrl); // debug purpose
 //                                showName.setClickable(true);
                             } else {
                                 Toast.makeText(getApplicationContext(), "No website for this place", Toast.LENGTH_SHORT).show();
@@ -115,7 +115,7 @@ public class ShowResult extends AppCompatActivity {
                 });
     }
 
-    private void showTextViews(Place myPlace) { // for debug purpose
+    private void showTextViews(Place myPlace) { // debug purpose
         TextView showAddress = findViewById(R.id.showAddressTxt);
         TextView showNoOfResults = findViewById(R.id.showNoOfResultsTxt);
         TextView showRating = findViewById(R.id.showRatingTxt);
@@ -132,12 +132,12 @@ public class ShowResult extends AppCompatActivity {
     }
 
     public void onGoClicked(View v) {
-        System.out.println("Inside onGoClicked function"); // for debug purpose
+        System.out.println("Inside onGoClicked function"); // debug purpose
         goToDestination(latAndLong);
     }
 
     public void onShuffleClicked(View v) {
-        System.out.println("Inside onShuffleClicked function"); // for debug purpose
+        System.out.println("Inside onShuffleClicked function"); // debug purpose
         if (shuffleCount <= 4) {
             matchUserReqList.remove(randNo);
             getTheOne();
@@ -158,12 +158,12 @@ public class ShowResult extends AppCompatActivity {
     }
 
     public void onHomeClicked(View v) {
-        System.out.println("Inside onHomeClicked function"); // for debug purpose
+        System.out.println("Inside onHomeClicked function"); // debug purpose
         Intent mainActivity =  new Intent(ShowResult.this, MainActivity.class);
         startActivity(mainActivity);
     }
     public void onNameClicked(View v) {
-        System.out.println("Inside onNameClicked function"); // for debug purpose
+        System.out.println("Inside onNameClicked function"); // debug purpose
         Uri uri = Uri.parse(placeUrl);
         Intent intent = new Intent(Intent.ACTION_VIEW, uri);
         startActivity(intent);
@@ -181,7 +181,7 @@ public class ShowResult extends AppCompatActivity {
     }
 
     public void onPhoneClicked(View v) {
-        System.out.println("Inside onPhoneClicked function"); // for debug purpose
+        System.out.println("Inside onPhoneClicked function"); // debug purpose
         Intent intent = new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + phoneNumber));
         startActivity(intent);
     }
