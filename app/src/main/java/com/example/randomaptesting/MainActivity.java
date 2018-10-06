@@ -1,37 +1,19 @@
 package com.example.randomaptesting;
 
-import android.Manifest;
-import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
-import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.location.Location;
-import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
-import android.support.v4.content.ContextCompat;
 import android.text.TextUtils;
-import android.view.View;
-import android.widget.ArrayAdapter;
-import android.widget.AutoCompleteTextView;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.RatingBar;
-import android.widget.SeekBar;
-import android.widget.Switch;
-import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.ToggleButton;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
@@ -49,28 +31,14 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResult;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
-import com.google.android.gms.location.places.GeoDataClient;
-import com.google.android.gms.location.places.Place;
-import com.google.android.gms.location.places.PlaceBufferResponse;
-import com.google.android.gms.location.places.Places;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.lang.reflect.Type;
-import java.net.InetAddress;
 import java.util.ArrayList;
-import java.util.Set;
-import java.util.Stack;
 
 /**
  * Created by chengchinlim on 5/29/18.
@@ -78,41 +46,49 @@ import java.util.Stack;
 
 public class MainActivity extends FragmentActivity {
 
-    String userKeyword;
-    double userRadius;
-    int userPrice;
-    double userRating;
+    String userKeyword = "burrito";
+    double userRadius = 1000;
+    int userPrice = 2;
+    double userRating = 3;
     boolean includePrice = false;
 //    SharedPreferences sharedPref = getSharedPreferences("previousDestination", Context.MODE_PRIVATE);
 
+    // main function of this activity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        if (!isNetworkConnected()) {
-            showDialog();
+        if (!isNetworkConnected()) { // if there is not internet connection
+            showDialog(); // prompt user to enable internet connection
         }
-        if (!checkLocationAccessPermitted())  {
-            requestLocationAccessPermission();
+        if (!checkLocationAccessPermitted())  { // if location service is not enabled
+            requestLocationAccessPermission(); // prompt user to open location service
         }
-        mainFunc();
+        getUserLocationThenCallAPI(); // get user location then callGoogleMapsAPI()
     }
 
+    // get user's location and call Google Maps API
     @SuppressWarnings("MissingPermission")
-    private void mainFunc() {
+    private void getUserLocationThenCallAPI() {
+        // create a fused location client, it is needed to get user's location
         FusedLocationProviderClient mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         mFusedLocationClient.getLastLocation()
+                // it needs a listener to check if this task is completed
             .addOnCompleteListener(this, new OnCompleteListener<Location>() {
                 @Override
-                public void onComplete(@NonNull Task<Location> task) {
+                public void onComplete(@NonNull Task<Location> task) { // if it is completed
+                    // if the user's location retrieval is successful
                     if (task.isSuccessful() && task.getResult() != null) {
-                        Location mLastLocation = task.getResult();
-                        final double myLatitude = mLastLocation.getLatitude();
-                        final double myLongitude = mLastLocation.getLongitude();
+                        Location mLastLocation = task.getResult(); // put user's location into a Location variable
+                        final double myLatitude = mLastLocation.getLatitude(); // get the latitude
+                        final double myLongitude = mLastLocation.getLongitude(); // get the longitude
 //                        System.out.println("Last known Location Latitude is " +
-//                                mLastLocation.getLatitude()); // debugPrint purpose
+//                                mLastLocation.getLatitude()); // debug purpose
 //                        System.out.println("Last known Location Longitude is " +
-//                                mLastLocation.getLongitude()); // debugPrint purpose
-                        callGoogleMapsApi(myLatitude, myLongitude);
+//                                mLastLocation.getLongitude()); // debug purpose
+
+                        // this function has to call in this "if" statement because the value
+                        // of the Location variable is local, it would be null if accessed outside
+                        callGoogleMapsApiToRetrieveData(myLatitude, myLongitude);
                     } else {
                         System.out.println("No Last known location found. Try current location..!");
                     }
@@ -120,9 +96,15 @@ public class MainActivity extends FragmentActivity {
             });
     }
 
-    public void callGoogleMapsApi(final double myLatitude, final double myLongitude) {
+    /* call Google Maps API through a URL address
+    *  Google Maps API would return a json file
+    *  Json functions are used to split the data to respective variables, e.g. name, address, rating
+    *  @param myLatitude: latitude of user's location
+    *  @param myLongitude: longitude of user's location
+    * */
+    public void callGoogleMapsApiToRetrieveData(final double myLatitude, final double myLongitude) {
         String completeUrl = constructNearbySearchUrl(myLatitude, myLongitude, "restaurant", userRadius * 1.3, userKeyword);
-        System.out.println(completeUrl); // debugPrint purpose
+        System.out.println(completeUrl); // debug purpose
         RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
         StringRequest stringRequest = new StringRequest(Request.Method.GET, completeUrl,
                 new Response.Listener<String>() {
@@ -143,10 +125,10 @@ public class MainActivity extends FragmentActivity {
                                         .getJSONObject("location").getString("lng");
                                 double placeLatitude = Double.parseDouble(latitude);
                                 double placeLongitude = Double.parseDouble(longitude);
-//                                System.out.println("placeLatitude: " + placeLatitude); // for debug purpose
-//                                System.out.println("placeLongitude: " + placeLongitude); // for debug purpose
-                                double distance = calculateDistance(myLatitude, myLongitude, placeLatitude, placeLongitude) * 1000;
-//                                System.out.println("Distance:" + distance); // for debug purpose
+//                                System.out.println("placeLatitude: " + placeLatitude); // debug purpose
+//                                System.out.println("placeLongitude: " + placeLongitude); // debug purpose
+                                double distance = calculateDisplacement(myLatitude, myLongitude, placeLatitude, placeLongitude) * 1000;
+//                                System.out.println("Distance:" + distance); // debug purpose
                                 String name = results.getJSONObject(i).getString("name");
                                 String placeId = results.getJSONObject(i).getString("place_id");
                                 String address = results.getJSONObject(i).getString("vicinity");
@@ -172,32 +154,37 @@ public class MainActivity extends FragmentActivity {
                         if (!includePrice) {
                             Toast.makeText(getApplicationContext(), "All nearby restaurants do not have price", Toast.LENGTH_SHORT).show();
                         }
-                        System.out.println("Destinations:"); // for debug purpose
-                        for (int i = 0; i < destinationList.size(); i++) {
-                            System.out.println(i+1 + ". " + destinationList.get(i));
-                        }
+//                        System.out.println("Destinations:"); // debug purpose
+//                        for (int i = 0; i < destinationList.size(); i++) {
+//                            System.out.println(i+1 + ". " + destinationList.get(i));
+//                        }
 
+                        // create two array lists to separate all the restaurants retrieved from the API
                         ArrayList<Destination> matchUserReqList = new ArrayList<>();
                         ArrayList<Destination> suggestions = new ArrayList<>();
 
                         for (Destination d: destinationList) {
-                            if (matchUserReq(d, includePrice)) {
-                                matchUserReqList.add(d);
-                            } else {
-                                suggestions.add(d);
+                            if (matchUserReq(d, includePrice)) { // if it matches user requirement
+                                matchUserReqList.add(d); // add into this list
+                            } else { // if not
+                                suggestions.add(d); // add into this list
                             }
                         }
-                        System.out.println("MatchUserReqList: "); // for debug purpose
-                        for (int i = 0; i < matchUserReqList.size(); i++) {
-                            System.out.println(Integer.toString(i+1) + ". " + matchUserReqList.get(i));
-                        }
-                        System.out.println("Suggestions: "); // for debug purpose
-                        for (int i = 0; i < suggestions.size(); i++) {
-                            System.out.println(Integer.toString(i+1) + ". " + suggestions.get(i));
-                        }
+//                        System.out.println("MatchUserReqList: "); // debug purpose
+//                        for (int i = 0; i < matchUserReqList.size(); i++) {
+//                            System.out.println(Integer.toString(i+1) + ". " + matchUserReqList.get(i));
+//                        }
+//                        System.out.println("Suggestions: "); // debug purpose
+//                        for (int i = 0; i < suggestions.size(); i++) {
+//                            System.out.println(Integer.toString(i+1) + ". " + suggestions.get(i));
+//                        }
+
+                        // create a new intent to switch to the next activity called: "Show result"
                         Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
+                        // pass both array list to the next activity
                         showResultActivity.putExtra("matchUserReqList", matchUserReqList);
                         showResultActivity.putExtra("suggestions", suggestions);
+                        // start the next activity
                         startActivity(showResultActivity);
                     }
                 }, new Response.ErrorListener() {
@@ -209,7 +196,13 @@ public class MainActivity extends FragmentActivity {
         );
         queue.add(stringRequest);
     }
-
+    /* check if the destination matches the user's criteria
+    * @return true if it matches or vice versa
+    * @param d: the restaurant that is going to checked if it matches user's criteria
+    * @param includePrice: if it is true include price then vice versa
+    * this happens because sometimes all restaurants in both array lists do not have price
+    * but we still want to show some restaurants in the list instead of nothing
+    * */
     private boolean matchUserReq(Destination d, boolean includePrice) {
         if (d.getDistance() > userRadius) {
             return false;
@@ -230,6 +223,10 @@ public class MainActivity extends FragmentActivity {
         return true;
     }
 
+    /* the below two functions are related to shared preferences
+    *  it is not yet working, would make it work soon
+    *
+    * */
 //    private void savePreviousDestination(ArrayList<Destination> prevDestination) {
 //
 //        SharedPreferences.Editor editor = sharedPref.edit();
@@ -247,7 +244,12 @@ public class MainActivity extends FragmentActivity {
 //        return destinations;
 //    }
 
-    private double calculateDistance(double myLatitude, double myLongitude, double placeLatitude, double placeLongitude) {
+    /* calculates the displacement between two coordinates (but not distance!!)
+    *  distance is only accurate using Distance Matrix API
+    *  @return the displacement between two coordinates
+    *  the parameters are the coordinates of user's location and restaurant's location
+    * */
+    private double calculateDisplacement(double myLatitude, double myLongitude, double placeLatitude, double placeLongitude) {
         double earthRadius = 6371;
         double latDiff = degreeToRadians(placeLatitude - myLatitude);
         double longDiff = degreeToRadians(placeLongitude - myLongitude);
@@ -259,6 +261,8 @@ public class MainActivity extends FragmentActivity {
         return d;
     }
 
+    /* convert degree to radians to perform calculations in the above function
+    * */
     private double degreeToRadians(double degree) {
         return degree * (Math.PI/180);
     }
