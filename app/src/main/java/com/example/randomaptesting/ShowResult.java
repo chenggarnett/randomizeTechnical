@@ -3,6 +3,7 @@ package com.example.randomaptesting;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 
 import com.google.android.gms.location.places.GeoDataClient;
@@ -39,9 +40,9 @@ public class ShowResult extends AppCompatActivity {
     *  in order to get specific details such as telephone number and website of the restaurant
     * */
     private void getTheOneRandomRestaurant() {
-        System.out.println("MatchUserReqList:");
+        Log.i("debugPrint", "MatchUserReqList:");
         debugPrint(matchUserReqList); // debug purpose
-        System.out.println("Suggestions:");
+        Log.i("debugPrint", "Suggestions:");
         debugPrint(suggestions); // debug purpose
         // if there is not restaurant, return
         if (matchUserReqList.size() == 0) {
@@ -168,11 +169,11 @@ public class ShowResult extends AppCompatActivity {
 
     private void debugPrint(ArrayList<Destination> destinationList) {
         for (int i = 0; i < destinationList.size(); i++) { // debug purpose
-            System.out.println(i+1 + ". " + "Name: " + destinationList.get(i).getName());
-            System.out.println(i+1 + ". " + "Address: " + destinationList.get(i).getAddress());
-            System.out.println(i+1 + ". " + "Rating: " + destinationList.get(i).getRating());
-            System.out.println(i+1 + ". " + "Website: " + destinationList.get(i).getWebsite());
-            System.out.println(i+1 + ". " + "Phone: " + destinationList.get(i).getTelNo());
+            Log.i("debugPrint",i+1 + ". " + "Name: " + destinationList.get(i).getName());
+            Log.i("debugPrint","   " + "Address: " + destinationList.get(i).getAddress());
+            Log.i("debugPrint","   " + "Rating: " + destinationList.get(i).getRating());
+            Log.i("debugPrint","   " + "Website: " + destinationList.get(i).getWebsite());
+            Log.i("debugPrint","   " + "Phone: " + destinationList.get(i).getTelNo());
         }
     }
 }

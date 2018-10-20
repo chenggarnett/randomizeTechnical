@@ -1,18 +1,22 @@
 package com.example.randomaptesting;
 
+import android.Manifest;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentSender;
+import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.provider.Settings;
-import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
-import android.text.TextUtils;
+import android.support.v4.content.ContextCompat;
+import android.util.Log;
 import android.widget.Toast;
 
 import com.android.volley.Request;
@@ -21,17 +25,9 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.PendingResult;
-import com.google.android.gms.common.api.ResultCallback;
-import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.LocationSettingsRequest;
-import com.google.android.gms.location.LocationSettingsResult;
-import com.google.android.gms.location.LocationSettingsStatusCodes;
-import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 
 import org.json.JSONArray;
@@ -51,49 +47,86 @@ public class MainActivity extends FragmentActivity {
     int userPrice = 2;
     double userRating = 3;
     boolean includePrice = false;
+    Location mLastLocation;
+    Handler handler = new Handler();
 //    SharedPreferences sharedPref = getSharedPreferences("previousDestination", Context.MODE_PRIVATE);
 
     // main function of this activity
+//    protected void onCreate(Bundle savedInstanceState) {
+//        super.onCreate(savedInstanceState);
+//        setContentView(R.layout.activity_main);
+//        if (!isNetworkConnected()) { // if there is not internet connection
+//            Toast.makeText(this, "Please restart your app after connecting to Internet", Toast.LENGTH_LONG).show();
+//            showDialog(); // prompt user to enable internet connection
+//        }
+//        if (!isLocationServiceEnabled())  { // if location service is not enabled and prompt user to open location service
+//            Toast.makeText(this, "Please restart your app after enabling your location service", Toast.LENGTH_LONG).show();
+//            Intent myIntent = new Intent( Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+//            getApplicationContext().startActivity(myIntent);
+//        }
+//        checkPermission();
+//    }
+
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        if (!isNetworkConnected()) { // if there is not internet connection
-            showDialog(); // prompt user to enable internet connection
-        }
-        if (!checkLocationAccessPermitted())  { // if location service is not enabled
-            requestLocationAccessPermission(); // prompt user to open location service
-        }
-        getUserLocationThenCallAPI(); // get user location then callGoogleMapsAPI()
+        getUserLocation(); // get user location then callGoogleMapsAPI()
     }
 
     // get user's location and call Google Maps API
-    @SuppressWarnings("MissingPermission")
-    private void getUserLocationThenCallAPI() {
-        // create a fused location client, it is needed to get user's location
-        FusedLocationProviderClient mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        mFusedLocationClient.getLastLocation()
-                // it needs a listener to check if this task is completed
-            .addOnCompleteListener(this, new OnCompleteListener<Location>() {
-                @Override
-                public void onComplete(@NonNull Task<Location> task) { // if it is completed
-                    // if the user's location retrieval is successful
-                    if (task.isSuccessful() && task.getResult() != null) {
-                        Location mLastLocation = task.getResult(); // put user's location into a Location variable
-                        final double myLatitude = mLastLocation.getLatitude(); // get the latitude
-                        final double myLongitude = mLastLocation.getLongitude(); // get the longitude
-//                        System.out.println("Last known Location Latitude is " +
-//                                mLastLocation.getLatitude()); // debug purpose
-//                        System.out.println("Last known Location Longitude is " +
-//                                mLastLocation.getLongitude()); // debug purpose
+    private void getUserLocation() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                ) {//Can add more as per requirement
+            Log.d("checkPermission", "onMapReady: opening the prompt");
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
+        } else {
+            // create a fused location client, it is needed to get user's location
+            FusedLocationProviderClient mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+            MyLocationSuccessListener listener = new MyLocationSuccessListener();
+            Task<Location> task = mFusedLocationClient.getLastLocation().addOnSuccessListener(listener);
+            final MyLocationRunnable runnable = new MyLocationRunnable(task);
+            handler.postDelayed(runnable, 2000);
+            CallGoogleMapsApiRunnable apiRunnable = new CallGoogleMapsApiRunnable();
+            handler.postDelayed(apiRunnable, 2500);
+        }
 
-                        // this function has to call in this "if" statement because the value
-                        // of the Location variable is local, it would be null if accessed outside
-                        callGoogleMapsApiToRetrieveData(myLatitude, myLongitude);
-                    } else {
-                        System.out.println("No Last known location found. Try current location..!");
-                    }
-                }
-            });
+    }
+
+    class MyLocationRunnable implements Runnable {
+
+        public Task<Location> locationTask;
+
+        public MyLocationRunnable(Task<Location> task) {
+            locationTask = task;
+        }
+
+        @Override
+        public void run() {
+            mLastLocation = locationTask.getResult();
+            Log.d("mLastLocation", "Latitude: " + mLastLocation.getLatitude());
+        }
+    }
+
+    class CallGoogleMapsApiRunnable implements Runnable {
+        @Override
+        public void run() {
+            callGoogleMapsApiToRetrieveData(mLastLocation.getLatitude(), mLastLocation.getLongitude());
+        }
+    }
+
+    class MyLocationSuccessListener implements OnSuccessListener<Location> {
+        @Override
+        public void onSuccess(Location location) {
+            Log.d("onSuccess","inside onSuccess");
+            if (location != null) {
+                Log.d("onSuccess","Retrieved location successfully");
+                Log.d("onSuccess", "Latitude: " + location.getLatitude() + " Longitude: " + location.getLongitude());
+            } else {
+                Log.d("onSuccess","Location is null");
+            }
+        }
     }
 
     /* call Google Maps API through a URL address
@@ -104,7 +137,7 @@ public class MainActivity extends FragmentActivity {
     * */
     public void callGoogleMapsApiToRetrieveData(final double myLatitude, final double myLongitude) {
         String completeUrl = constructNearbySearchUrl(myLatitude, myLongitude, "restaurant", userRadius * 1.3, userKeyword);
-        System.out.println(completeUrl); // debug purpose
+        Log.i("API", completeUrl); // debug purpose
         RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
         StringRequest stringRequest = new StringRequest(Request.Method.GET, completeUrl,
                 new Response.Listener<String>() {
@@ -125,10 +158,7 @@ public class MainActivity extends FragmentActivity {
                                         .getJSONObject("location").getString("lng");
                                 double placeLatitude = Double.parseDouble(latitude);
                                 double placeLongitude = Double.parseDouble(longitude);
-//                                System.out.println("placeLatitude: " + placeLatitude); // debug purpose
-//                                System.out.println("placeLongitude: " + placeLongitude); // debug purpose
                                 double distance = calculateDisplacement(myLatitude, myLongitude, placeLatitude, placeLongitude) * 1000;
-//                                System.out.println("Distance:" + distance); // debug purpose
                                 String name = results.getJSONObject(i).getString("name");
                                 String placeId = results.getJSONObject(i).getString("place_id");
                                 String address = results.getJSONObject(i).getString("vicinity");
@@ -322,71 +352,99 @@ public class MainActivity extends FragmentActivity {
     }
 
     /*
-    * The below two functions are used to check if the user has enabled location services
+    * The below functions are used to check if the user has enabled location services
     * and prompt them to open it if it is not enabled
     * */
 
-    private boolean checkLocationAccessPermitted() {
-        int locationMode = 0;
-        String locationProviders;
+    protected boolean isLocationServiceEnabled(){
+        LocationManager locationManager = null;
+        boolean gps_enabled= false;
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT){
-            try {
-                locationMode = Settings.Secure.getInt(getApplicationContext().getContentResolver(), Settings.Secure.LOCATION_MODE);
-
-            } catch (Settings.SettingNotFoundException e) {
-                e.printStackTrace();
-                return false;
-            }
-
-            return locationMode != Settings.Secure.LOCATION_MODE_OFF;
-
-        }else{
-            locationProviders = Settings.Secure.getString(getApplicationContext().getContentResolver(), Settings.Secure.LOCATION_PROVIDERS_ALLOWED);
-            return !TextUtils.isEmpty(locationProviders);
+        if(locationManager ==null)
+            locationManager = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
+        try{
+            gps_enabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+        }catch(Exception ex){
+            //do nothing...
         }
+        return gps_enabled;
     }
 
-    private void requestLocationAccessPermission() {
-        GoogleApiClient googleApiClient = new GoogleApiClient.Builder(getApplicationContext())
-                .addApi(LocationServices.API).build();
-        googleApiClient.connect();
-
-        LocationRequest locationRequest = LocationRequest.create();
-        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        locationRequest.setInterval(10000);
-        locationRequest.setFastestInterval(10000 / 2);
-
-        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder().addLocationRequest(locationRequest);
-        builder.setAlwaysShow(true);
-
-        PendingResult<LocationSettingsResult> result = LocationServices.SettingsApi.checkLocationSettings(googleApiClient, builder.build());
-        result.setResultCallback(new ResultCallback<LocationSettingsResult>() {
-            @Override
-            public void onResult(LocationSettingsResult result) {
-                final Status status = result.getStatus();
-                switch (status.getStatusCode()) {
-                    case LocationSettingsStatusCodes.SUCCESS:
-                        System.out.println("All location settings are satisfied.");
-                        break;
-                    case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
-                        System.out.println("Location settings are not satisfied. Show the user a dialog to upgrade location settings ");
-
-                        try {
-                            // Show the dialog by calling startResolutionForResult(), and check the result
-                            // in onActivityResult().
-                            status.startResolutionForResult(MainActivity.this, 1);
-                        } catch (IntentSender.SendIntentException e) {
-                            System.out.println("PendingIntent unable to execute request.");
-                        }
-                        break;
-                    case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
-                        System.out.println("Location settings are inadequate, and cannot be fixed here. Dialog not created.");
-                        break;
-                }
-            }
-        });
+    protected boolean checkPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                ) {//Can add more as per requirement
+            Log.d("checkPermission", "opening the prompt");
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
+            return false;
+        } else {
+            Log.d("checkPermission", "Location is allowed");
+        }
+        return true;
     }
+
+//    private boolean checkLocationAccessPermitted() {
+//        int locationMode = 0;
+//        String locationProviders;
+//
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT){
+//            try {
+//                locationMode = Settings.Secure.getInt(getApplicationContext().getContentResolver(), Settings.Secure.LOCATION_MODE);
+//
+//            } catch (Settings.SettingNotFoundException e) {
+//                e.printStackTrace();
+//                return false;
+//            }
+//
+//            return locationMode != Settings.Secure.LOCATION_MODE_OFF;
+//
+//        }else{
+//            locationProviders = Settings.Secure.getString(getApplicationContext().getContentResolver(), Settings.Secure.LOCATION_PROVIDERS_ALLOWED);
+//            return !TextUtils.isEmpty(locationProviders);
+//        }
+//    }
+
+//    private void requestLocationAccessPermission() {
+//        GoogleApiClient googleApiClient = new GoogleApiClient.Builder(getApplicationContext())
+//                .addApi(LocationServices.API).build();
+//        googleApiClient.connect();
+//
+//        LocationRequest locationRequest = LocationRequest.create();
+//        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+//        locationRequest.setInterval(10000);
+//        locationRequest.setFastestInterval(10000 / 2);
+//
+//        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder().addLocationRequest(locationRequest);
+//        builder.setAlwaysShow(true);
+//
+//        PendingResult<LocationSettingsResult> result = LocationServices.SettingsApi.checkLocationSettings(googleApiClient, builder.build());
+//        result.setResultCallback(new ResultCallback<LocationSettingsResult>() {
+//            @Override
+//            public void onResult(LocationSettingsResult result) {
+//                final Status status = result.getStatus();
+//                switch (status.getStatusCode()) {
+//                    case LocationSettingsStatusCodes.SUCCESS:
+//                        System.out.println("All location settings are satisfied.");
+//                        break;
+//                    case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
+//                        System.out.println("Location settings are not satisfied. Show the user a dialog to upgrade location settings ");
+//
+//                        try {
+//                            // Show the dialog by calling startResolutionForResult(), and check the result
+//                            // in onActivityResult().
+//                            status.startResolutionForResult(MainActivity.this, 1);
+//                        } catch (IntentSender.SendIntentException e) {
+//                            System.out.println("PendingIntent unable to execute request.");
+//                        }
+//                        break;
+//                    case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
+//                        System.out.println("Location settings are inadequate, and cannot be fixed here. Dialog not created.");
+//                        break;
+//                }
+//            }
+//        });
+//    }
 
     /*
      * The code below are UI elements, it would be changed to the newest design accordingly

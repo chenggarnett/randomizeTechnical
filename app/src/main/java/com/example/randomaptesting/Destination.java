@@ -119,7 +119,7 @@ public class Destination implements Serializable, Comparable<Destination> {
     public static final Comparator<Destination> RatingComparator = new Comparator<Destination>() {
         @Override
         public int compare(Destination d1, Destination d2) {
-            return (int)Math.signum(d1.distance - d2.distance);
+            return (int)Math.signum(d1.rating - d2.rating);
         }
     };
 
