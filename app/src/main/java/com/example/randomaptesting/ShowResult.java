@@ -24,11 +24,14 @@ public class ShowResult extends AppCompatActivity {
     private ArrayList<Destination> suggestions;
     private int randNo;
     String phoneNumber;
+    GeoDataClient mGeoDataClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_show_result);
+        mGeoDataClient = Places
+                .getGeoDataClient(getApplicationContext(), null);
         // get the array lists of restaurants from the previous activity (API)
         matchUserReqList = (ArrayList<Destination>)getIntent().getSerializableExtra("matchUserReqList");
         suggestions = (ArrayList<Destination>)getIntent().getSerializableExtra("suggestions");
@@ -53,11 +56,12 @@ public class ShowResult extends AppCompatActivity {
         randNo = randomize(matchUserReqList.size());
         // create GeoDataClient object to get access to Google Places API
         // try to get one specific restaurant
-        GeoDataClient mGeoDataClient = Places
-                .getGeoDataClient(getApplicationContext(), null);
+
         // get the restaurant based on the place Id retrieved from json in the previous activity
-        mGeoDataClient.getPlaceById(matchUserReqList
-                .get(randNo).getId())
+        Destination randomRestaurant = matchUserReqList
+                .get(randNo);
+        Log.d("randomRestaurant", "getTheOneRandomRestaurant: Restaurant name: " + randomRestaurant.getName());
+        mGeoDataClient.getPlaceById(randomRestaurant.getId())
                 .addOnCompleteListener(new OnCompleteListener<PlaceBufferResponse>() {
                     @Override
                     public void onComplete(@NonNull Task<PlaceBufferResponse> task) { // check if the task is complete
@@ -67,23 +71,17 @@ public class ShowResult extends AppCompatActivity {
                             PlaceBufferResponse places = task.getResult();
                             // assign the first place into a Place variable
                             Place myPlace = places.get(0);
-                            System.out.println("Place found: " + myPlace.getName()); // debug purpose
-//                            latAndLong = myPlace.getLatLng().toString();
-//                            latAndLong = latAndLong.substring(10, latAndLong.length() - 1);
-//                            System.out.println("Lat and Long: " + latAndLong); // debug purpose
-//                            showName.setClickable(false);
-//                            if (myPlace.getWebsiteUri() != null) {
-//                                placeUrl = myPlace.getWebsiteUri().toString();
-////                                System.out.println("Place URL is " + placeUrl); // debug purpose
-//                                showName.setClickable(true);
-//                            } else {
-//                                Toast.makeText(getApplicationContext(), "No website for this place", Toast.LENGTH_SHORT).show();
-//                            }
-//                            showTextViews(myPlace); // for debug purpose
+                            Log.i("Place", "onComplete: Place name: " + myPlace.getName());
+                            if (myPlace.getWebsiteUri() != null) {
+                                Log.i("Place", "onComplete: Place website: " + myPlace.getWebsiteUri());
+                            }
+                            if (myPlace.getPhoneNumber() != null) {
+                                Log.i("Place", "onComplete: Place no: " + myPlace.getPhoneNumber());
+                            }
                             places.release(); // release the place from buffer (mandatory)
 
                         } else {
-                            System.out.println("Place not found.");
+                            Log.d("Place", "Place not found.");
                         }
                     }
                 });
@@ -172,8 +170,8 @@ public class ShowResult extends AppCompatActivity {
             Log.i("debugPrint",i+1 + ". " + "Name: " + destinationList.get(i).getName());
             Log.i("debugPrint","   " + "Address: " + destinationList.get(i).getAddress());
             Log.i("debugPrint","   " + "Rating: " + destinationList.get(i).getRating());
-            Log.i("debugPrint","   " + "Website: " + destinationList.get(i).getWebsite());
-            Log.i("debugPrint","   " + "Phone: " + destinationList.get(i).getTelNo());
+//            Log.i("debugPrint","   " + "Website: " + destinationList.get(i).getWebsite());
+//            Log.i("debugPrint","   " + "Phone: " + destinationList.get(i).getTelNo());
         }
     }
 }

@@ -87,7 +87,7 @@ public class MainActivity extends FragmentActivity {
             MyLocationSuccessListener listener = new MyLocationSuccessListener();
             Task<Location> task = mFusedLocationClient.getLastLocation().addOnSuccessListener(listener);
             final MyLocationRunnable runnable = new MyLocationRunnable(task);
-            handler.postDelayed(runnable, 2000);
+            handler.postDelayed(runnable, 1000);
             CallGoogleMapsApiRunnable apiRunnable = new CallGoogleMapsApiRunnable();
             handler.postDelayed(apiRunnable, 2500);
         }
@@ -135,6 +135,7 @@ public class MainActivity extends FragmentActivity {
     *  @param myLatitude: latitude of user's location
     *  @param myLongitude: longitude of user's location
     * */
+
     public void callGoogleMapsApiToRetrieveData(final double myLatitude, final double myLongitude) {
         String completeUrl = constructNearbySearchUrl(myLatitude, myLongitude, "restaurant", userRadius * 1.3, userKeyword);
         Log.i("API", completeUrl); // debug purpose
@@ -151,44 +152,13 @@ public class MainActivity extends FragmentActivity {
                                 Toast.makeText(getApplicationContext(), "There is no nearby" + " \"" + userKeyword + "\" " +  "restaurants", Toast.LENGTH_SHORT).show();
                                 return;
                             }
-                            for (int i = 0; i < results.length(); i++) {
-                                String latitude = results.getJSONObject(i).getJSONObject("geometry")
-                                        .getJSONObject("location").getString("lat");
-                                String longitude = results.getJSONObject(i).getJSONObject("geometry")
-                                        .getJSONObject("location").getString("lng");
-                                double placeLatitude = Double.parseDouble(latitude);
-                                double placeLongitude = Double.parseDouble(longitude);
-                                double distance = calculateDisplacement(myLatitude, myLongitude, placeLatitude, placeLongitude) * 1000;
-                                String name = results.getJSONObject(i).getString("name");
-                                String placeId = results.getJSONObject(i).getString("place_id");
-                                String address = results.getJSONObject(i).getString("vicinity");
-                                int price = 0;
-                                if (results.getJSONObject(i).has("price_level")) {
-                                    includePrice = true;
-                                    String price_level = results.getJSONObject(i).getString("price_level");
-                                    price = Integer.parseInt(price_level);
-                                }
-                                double rating = 0;
-                                if (results.getJSONObject(i).has("rating")) {
-                                    String r = results.getJSONObject(i).getString("rating");
-                                    rating = Double.parseDouble(r);
-                                }
-                                Destination d = new Destination(name, address, placeId, distance);
-                                d.setPrice(price);
-                                d.setRating(rating);
-                                destinationList.add(d);
-                            }
+                            destinationList = getDestinationList(results);
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
                         if (!includePrice) {
                             Toast.makeText(getApplicationContext(), "All nearby restaurants do not have price", Toast.LENGTH_SHORT).show();
                         }
-//                        System.out.println("Destinations:"); // debug purpose
-//                        for (int i = 0; i < destinationList.size(); i++) {
-//                            System.out.println(i+1 + ". " + destinationList.get(i));
-//                        }
-
                         // create two array lists to separate all the restaurants retrieved from the API
                         ArrayList<Destination> matchUserReqList = new ArrayList<>();
                         ArrayList<Destination> suggestions = new ArrayList<>();
@@ -200,14 +170,6 @@ public class MainActivity extends FragmentActivity {
                                 suggestions.add(d); // add into this list
                             }
                         }
-//                        System.out.println("MatchUserReqList: "); // debug purpose
-//                        for (int i = 0; i < matchUserReqList.size(); i++) {
-//                            System.out.println(Integer.toString(i+1) + ". " + matchUserReqList.get(i));
-//                        }
-//                        System.out.println("Suggestions: "); // debug purpose
-//                        for (int i = 0; i < suggestions.size(); i++) {
-//                            System.out.println(Integer.toString(i+1) + ". " + suggestions.get(i));
-//                        }
 
                         // create a new intent to switch to the next activity called: "Show result"
                         Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
@@ -226,6 +188,39 @@ public class MainActivity extends FragmentActivity {
         );
         queue.add(stringRequest);
     }
+
+    private ArrayList<Destination> getDestinationList(JSONArray results) throws JSONException {
+        ArrayList<Destination> destinationList = new ArrayList<>();
+        for (int i = 0; i < results.length(); i++) {
+            String latitude = results.getJSONObject(i).getJSONObject("geometry")
+                    .getJSONObject("location").getString("lat");
+            String longitude = results.getJSONObject(i).getJSONObject("geometry")
+                    .getJSONObject("location").getString("lng");
+            double placeLatitude = Double.parseDouble(latitude);
+            double placeLongitude = Double.parseDouble(longitude);
+            double distance = calculateDisplacement(mLastLocation.getLatitude(), mLastLocation.getLongitude(), placeLatitude, placeLongitude) * 1000;
+            String name = results.getJSONObject(i).getString("name");
+            String placeId = results.getJSONObject(i).getString("place_id");
+            String address = results.getJSONObject(i).getString("vicinity");
+            int price = 0;
+            if (results.getJSONObject(i).has("price_level")) {
+                includePrice = true;
+                String price_level = results.getJSONObject(i).getString("price_level");
+                price = Integer.parseInt(price_level);
+            }
+            double rating = 0;
+            if (results.getJSONObject(i).has("rating")) {
+                String r = results.getJSONObject(i).getString("rating");
+                rating = Double.parseDouble(r);
+            }
+            Destination d = new Destination(name, address, placeId, distance);
+            d.setPrice(price);
+            d.setRating(rating);
+            destinationList.add(d);
+        }
+        return destinationList;
+    }
+
     /* check if the destination matches the user's criteria
     * @return true if it matches or vice versa
     * @param d: the restaurant that is going to checked if it matches user's criteria
