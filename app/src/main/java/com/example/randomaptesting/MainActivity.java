@@ -11,7 +11,6 @@ import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
-import android.os.Handler;
 import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
@@ -28,7 +27,6 @@ import com.android.volley.toolbox.Volley;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.Task;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -48,7 +46,7 @@ public class MainActivity extends FragmentActivity {
     double userRating = 3;
     boolean includePrice = false;
     Location mLastLocation;
-    Handler handler = new Handler();
+//    Handler handler = new Handler();
 //    SharedPreferences sharedPref = getSharedPreferences("previousDestination", Context.MODE_PRIVATE);
 
     // main function of this activity
@@ -70,11 +68,28 @@ public class MainActivity extends FragmentActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        getUserLocation(); // get user location then callGoogleMapsAPI()
+        getUserLocation(new LocationVolleyCallback() {
+            @Override
+            public void onSuccess(final Location userLocation) {
+                Log.i("Location", "onSuccess: Latitude is " + userLocation.getLatitude());
+                callGooglePlacesApiToRetrieveJSON(userLocation.getLatitude(), userLocation.getLongitude(), new NearbySearchVolleyCallback() {
+                    @Override
+                    public void onSuccess(JSONArray restaurantDetails) {
+                        Log.i("Location", "onSuccess2: Latitude is " + userLocation.getLatitude());
+                        try {
+                            ArrayList<Destination> destinations = getDestinationList(restaurantDetails, userLocation.getLatitude(), userLocation.getLongitude());
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
+
+            }
+        }); // get user location then callGoogleMapsAPI()
     }
 
     // get user's location and call Google Maps API
-    private void getUserLocation() {
+    private void getUserLocation(final LocationVolleyCallback callback) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
                 ) {//Can add more as per requirement
@@ -84,49 +99,19 @@ public class MainActivity extends FragmentActivity {
         } else {
             // create a fused location client, it is needed to get user's location
             FusedLocationProviderClient mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-            MyLocationSuccessListener listener = new MyLocationSuccessListener();
-            Task<Location> task = mFusedLocationClient.getLastLocation().addOnSuccessListener(listener);
-            final MyLocationRunnable runnable = new MyLocationRunnable(task);
-            handler.postDelayed(runnable, 1000);
-            CallGoogleMapsApiRunnable apiRunnable = new CallGoogleMapsApiRunnable();
-            handler.postDelayed(apiRunnable, 2500);
+//            MyLocationSuccessListener listener = new MyLocationSuccessListener();
+            mFusedLocationClient.getLastLocation().addOnSuccessListener(new OnSuccessListener<Location>() {
+                @Override
+                public void onSuccess(Location location) {
+                    callback.onSuccess(location);
+                }
+            });
+//            final MyLocationRunnable runnable = new MyLocationRunnable(task);
+//            handler.postDelayed(runnable, 1000);
+//            CallGoogleMapsApiRunnable apiRunnable = new CallGoogleMapsApiRunnable();
+//            handler.postDelayed(apiRunnable, 2500);
         }
 
-    }
-
-    class MyLocationRunnable implements Runnable {
-
-        public Task<Location> locationTask;
-
-        public MyLocationRunnable(Task<Location> task) {
-            locationTask = task;
-        }
-
-        @Override
-        public void run() {
-            mLastLocation = locationTask.getResult();
-            Log.d("mLastLocation", "Latitude: " + mLastLocation.getLatitude());
-        }
-    }
-
-    class CallGoogleMapsApiRunnable implements Runnable {
-        @Override
-        public void run() {
-            callGoogleMapsApiToRetrieveData(mLastLocation.getLatitude(), mLastLocation.getLongitude());
-        }
-    }
-
-    class MyLocationSuccessListener implements OnSuccessListener<Location> {
-        @Override
-        public void onSuccess(Location location) {
-            Log.d("onSuccess","inside onSuccess");
-            if (location != null) {
-                Log.d("onSuccess","Retrieved location successfully");
-                Log.d("onSuccess", "Latitude: " + location.getLatitude() + " Longitude: " + location.getLongitude());
-            } else {
-                Log.d("onSuccess","Location is null");
-            }
-        }
     }
 
     /* call Google Maps API through a URL address
@@ -136,7 +121,7 @@ public class MainActivity extends FragmentActivity {
     *  @param myLongitude: longitude of user's location
     * */
 
-    public void callGoogleMapsApiToRetrieveData(final double myLatitude, final double myLongitude) {
+    public void callGooglePlacesApiToRetrieveJSON(final double myLatitude, final double myLongitude, final NearbySearchVolleyCallback callback) {
         String completeUrl = constructNearbySearchUrl(myLatitude, myLongitude, "restaurant", userRadius * 1.3, userKeyword);
         Log.i("API", completeUrl); // debug purpose
         RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
@@ -152,7 +137,8 @@ public class MainActivity extends FragmentActivity {
                                 Toast.makeText(getApplicationContext(), "There is no nearby" + " \"" + userKeyword + "\" " +  "restaurants", Toast.LENGTH_SHORT).show();
                                 return;
                             }
-                            destinationList = getDestinationList(results);
+                            callback.onSuccess(results);
+//                            destinationList = getDestinationList(results);
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
@@ -189,19 +175,37 @@ public class MainActivity extends FragmentActivity {
         queue.add(stringRequest);
     }
 
-    private ArrayList<Destination> getDestinationList(JSONArray results) throws JSONException {
+    public void callGoogleDistanceMatrixAPI(String destinationId, double latitude, double longitude, final DistanceMatrixVolleyCallback callback) {
+        String completeUrl = constructDistanceMatrixUrls(destinationId, latitude, longitude);
+        Log.i("API", "callGoogleDistanceMatrixAPI: " + completeUrl);
+        RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
+        StringRequest stringRequest = new StringRequest(Request.Method.GET, completeUrl, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String response) {
+                Log.d("API", "onResponse: call back success");
+                callback.onSuccess(response);
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+
+            }
+        });
+        queue.add(stringRequest);
+
+    }
+
+    private ArrayList<Destination> getDestinationList(JSONArray results, double mLatitude, double mLongitude) throws JSONException {
         ArrayList<Destination> destinationList = new ArrayList<>();
+
         for (int i = 0; i < results.length(); i++) {
-            String latitude = results.getJSONObject(i).getJSONObject("geometry")
-                    .getJSONObject("location").getString("lat");
-            String longitude = results.getJSONObject(i).getJSONObject("geometry")
-                    .getJSONObject("location").getString("lng");
-            double placeLatitude = Double.parseDouble(latitude);
-            double placeLongitude = Double.parseDouble(longitude);
-            double distance = calculateDisplacement(mLastLocation.getLatitude(), mLastLocation.getLongitude(), placeLatitude, placeLongitude) * 1000;
-            String name = results.getJSONObject(i).getString("name");
-            String placeId = results.getJSONObject(i).getString("place_id");
-            String address = results.getJSONObject(i).getString("vicinity");
+//            String latitude = results.getJSONObject(i).getJSONObject("geometry")
+//                    .getJSONObject("location").getString("lat");
+//            String longitude = results.getJSONObject(i).getJSONObject("geometry")
+//                    .getJSONObject("location").getString("lng");
+            final String name = results.getJSONObject(i).getString("name");
+            final String placeId = results.getJSONObject(i).getString("place_id");
+            final String address = results.getJSONObject(i).getString("vicinity");
             int price = 0;
             if (results.getJSONObject(i).has("price_level")) {
                 includePrice = true;
@@ -213,13 +217,35 @@ public class MainActivity extends FragmentActivity {
                 String r = results.getJSONObject(i).getString("rating");
                 rating = Double.parseDouble(r);
             }
-            Destination d = new Destination(name, address, placeId, distance);
-            d.setPrice(price);
-            d.setRating(rating);
-            destinationList.add(d);
+            final Destination[] d = new Destination[1];
+            callGoogleDistanceMatrixAPI(placeId, mLatitude, mLongitude, new DistanceMatrixVolleyCallback() {
+                @Override
+                public String onSuccess(String distanceResults) {
+                    String realDistance = "";
+                    try {
+//                        Log.d("Restaurants", "onSuccess: first restaurant: " + destinations.get(0).getName());
+                        Log.d("InsideDistance", "onSuccess: " + distanceResults);
+                        JSONObject obj = new JSONObject(distanceResults);
+                        realDistance = obj.getJSONArray("rows").getJSONObject(0)
+                                .getJSONArray("elements").getJSONObject(0)
+                                .getJSONObject("distance").getString("value");
+                        Log.d("realDistance", "onSuccess: " + realDistance);
+                        d[0] = new Destination(name, address, placeId, Double.parseDouble(realDistance));
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    return realDistance;
+                }
+            });
+//            Destination d = new Destination(name, address, placeId, 0);
+            d[0].setPrice(price);
+            d[0].setRating(rating);
+            destinationList.add(d[0]);
         }
         return destinationList;
     }
+
+
 
     /* check if the destination matches the user's criteria
     * @return true if it matches or vice versa
@@ -247,6 +273,41 @@ public class MainActivity extends FragmentActivity {
 
         return true;
     }
+
+    //    class MyLocationRunnable implements Runnable {
+//
+//        public Task<Location> locationTask;
+//
+//        public MyLocationRunnable(Task<Location> task) {
+//            locationTask = task;
+//        }
+//
+//        @Override
+//        public void run() {
+//            mLastLocation = locationTask.getResult();
+//            Log.d("mLastLocation", "Latitude: " + mLastLocation.getLatitude());
+//        }
+//    }
+//
+//    class CallGoogleMapsApiRunnable implements Runnable {
+//        @Override
+//        public void run() {
+//            callGooglePlacesApiToRetrieveJSON(mLastLocation.getLatitude(), mLastLocation.getLongitude());
+//        }
+//    }
+
+//    class MyLocationSuccessListener implements OnSuccessListener<Location> {
+//        @Override
+//        public void onSuccess(Location location) {
+//            Log.d("onSuccess","inside onSuccess");
+//            if (location != null) {
+//                Log.d("onSuccess","Retrieved location successfully");
+//                Log.d("onSuccess", "Latitude: " + location.getLatitude() + " Longitude: " + location.getLongitude());
+//            } else {
+//                Log.d("onSuccess","Location is null");
+//            }
+//        }
+//    }
 
     /* the below two functions are related to shared preferences
     *  it is not yet working, would make it work soon
@@ -290,6 +351,14 @@ public class MainActivity extends FragmentActivity {
     * */
     private double degreeToRadians(double degree) {
         return degree * (Math.PI/180);
+    }
+
+    private String constructDistanceMatrixUrls(String destinationId, double latitude, double longitude) {
+        String origin = latitude + "," + longitude;
+        String distanceMatrixUrl = "https://maps.googleapis.com/maps/api/distancematrix/json?units=imperial&origins="
+                + origin + "&destinations=place_id:" + destinationId + "&key=AIzaSyDpKpQ2S8lvUK7xfHGgSoJXy0HG9tFU-7s";
+        Log.i("API", "constructDistanceMatrixUrls: " + distanceMatrixUrl);
+        return distanceMatrixUrl;
     }
 
     private String constructNearbySearchUrl(double latitude, double longitude,

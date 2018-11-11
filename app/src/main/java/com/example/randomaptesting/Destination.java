@@ -108,25 +108,4 @@ public class Destination implements Serializable, Comparable<Destination> {
         else
             return 1;
     }
-
-    public static final Comparator<Destination> DistanceComparator = new Comparator<Destination>() {
-        @Override
-        public int compare(Destination d1, Destination d2) {
-            return (int)Math.signum(d1.distance - d2.distance);
-        }
-    };
-
-    public static final Comparator<Destination> RatingComparator = new Comparator<Destination>() {
-        @Override
-        public int compare(Destination d1, Destination d2) {
-            return (int)Math.signum(d1.rating - d2.rating);
-        }
-    };
-
-    public static final Comparator<Destination> PriceComparator = new Comparator<Destination>() {
-        @Override
-        public int compare(Destination d1, Destination d2) {
-            return (int)Math.signum(d1.price - d2.price);
-        }
-    };
 }

@@ -14,16 +14,15 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Random;
 
 public class ShowResult extends AppCompatActivity {
 
-    private String latAndLong;
-    private String placeUrl;
     private ArrayList<Destination> matchUserReqList;
     private ArrayList<Destination> suggestions;
     private int randNo;
-    String phoneNumber;
     GeoDataClient mGeoDataClient;
 
     @Override
@@ -35,6 +34,13 @@ public class ShowResult extends AppCompatActivity {
         // get the array lists of restaurants from the previous activity (API)
         matchUserReqList = (ArrayList<Destination>)getIntent().getSerializableExtra("matchUserReqList");
         suggestions = (ArrayList<Destination>)getIntent().getSerializableExtra("suggestions");
+        debugPrintList(false, false,false, false, false);
+        sorting(DistanceComparator);
+        debugPrintList(true, false, false, false, false);
+        sorting(PriceComparator);
+        debugPrintList(false, true, false, false, false);
+        sorting(RatingComparator);
+        debugPrintList(false, false, true, false, false);
 
         getTheOneRandomRestaurant();
     }
@@ -43,10 +49,6 @@ public class ShowResult extends AppCompatActivity {
     *  in order to get specific details such as telephone number and website of the restaurant
     * */
     private void getTheOneRandomRestaurant() {
-        Log.i("debugPrint", "MatchUserReqList:");
-        debugPrint(matchUserReqList); // debug purpose
-        Log.i("debugPrint", "Suggestions:");
-        debugPrint(suggestions); // debug purpose
         // if there is not restaurant, return
         if (matchUserReqList.size() == 0) {
             Toast.makeText(this,"0 results", Toast.LENGTH_LONG).show();
@@ -87,6 +89,11 @@ public class ShowResult extends AppCompatActivity {
                 });
     }
 
+    private void sorting(Comparator<Destination> comparator) {
+        Collections.sort(matchUserReqList, comparator);
+        Collections.sort(suggestions, comparator);
+    }
+
 //    private void showTextViews(Place myPlace) { // debug purpose
 //        TextView showAddress = findViewById(R.id.showAddressTxt);
 //        TextView showNoOfResults = findViewById(R.id.showNoOfResultsTxt);
@@ -109,12 +116,12 @@ public class ShowResult extends AppCompatActivity {
 //
 //    public void onShuffleClicked(View v) {
 //        System.out.println("Should print out the list"); // debug purpose
-//        Collections.sort(suggestions, Destination.DistanceComparator);
+//        Collections.sorting(suggestions, Destination.DistanceComparator);
 //        System.out.println("Sorted according to distance"); // debug purpose
 //        for (Destination d: suggestions) {
 //            System.out.println(d);
 //        }
-//        Collections.sort(suggestions, Destination.DistanceComparator);
+//        Collections.sorting(suggestions, Destination.DistanceComparator);
 //        System.out.println("Sorted according to distance"); // debug purpose
 //        for (Destination d: suggestions) {
 //            System.out.println(d);
@@ -165,13 +172,55 @@ public class ShowResult extends AppCompatActivity {
         return a;
     }
 
-    private void debugPrint(ArrayList<Destination> destinationList) {
+    private void debugPrintList(boolean showDistance, boolean showPrice, boolean showRating, boolean showTelNo, boolean showWebsite) {
+        Log.i("debugPrint", "MatchUserReqList:");
+        debugPrint(matchUserReqList, showDistance, showPrice, showRating, showTelNo, showWebsite); // debug purpose
+        Log.i("debugPrint", "Suggestions:");
+        debugPrint(suggestions, showDistance, showPrice, showRating, showTelNo, showWebsite); // debug purpose
+    }
+
+    private void debugPrint(ArrayList<Destination> destinationList,
+                            boolean showDistance, boolean showPrice, boolean showRating, boolean showTelNo, boolean showWebsite) {
         for (int i = 0; i < destinationList.size(); i++) { // debug purpose
             Log.i("debugPrint",i+1 + ". " + "Name: " + destinationList.get(i).getName());
             Log.i("debugPrint","   " + "Address: " + destinationList.get(i).getAddress());
-            Log.i("debugPrint","   " + "Rating: " + destinationList.get(i).getRating());
-//            Log.i("debugPrint","   " + "Website: " + destinationList.get(i).getWebsite());
-//            Log.i("debugPrint","   " + "Phone: " + destinationList.get(i).getTelNo());
+            if (showDistance) {
+                Log.i("debugPrint", "   " + "Distance: " +  destinationList.get(i).getDistance());
+            }
+            if (showPrice) {
+                Log.i("debugPrint", "   " + "Price: " +  destinationList.get(i).getPrice());
+            }
+            if (showRating) {
+                Log.i("debugPrint","   " + "Rating: " + destinationList.get(i).getRating());
+            }
+            if (showTelNo) {
+                Log.i("debugPrint","   " + "Phone: " + destinationList.get(i).getTelNo());
+            }
+            if (showWebsite){
+                Log.i("debugPrint","   " + "Website: " + destinationList.get(i).getWebsite());
+            }
         }
     }
+
+    public static final Comparator<Destination> DistanceComparator = new Comparator<Destination>() {
+        @Override
+        public int compare(Destination d1, Destination d2) {
+            return (int)Math.signum(d1.getDistance() - d2.getDistance());
+        }
+    };
+
+    public static final Comparator<Destination> RatingComparator = new Comparator<Destination>() {
+        @Override
+        public int compare(Destination d1, Destination d2) {
+            return (int)Math.signum(d2.getRating() - d1.getRating());
+        }
+    };
+
+    public static final Comparator<Destination> PriceComparator = new Comparator<Destination>() {
+        @Override
+        public int compare(Destination d1, Destination d2) {
+            return (int)Math.signum(d1.getPrice() - d2.getPrice());
+        }
+    };
+
 }
