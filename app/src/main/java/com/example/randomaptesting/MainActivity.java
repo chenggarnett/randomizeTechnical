@@ -45,7 +45,7 @@ public class MainActivity extends FragmentActivity {
     int userPrice = 2;
     double userRating = 3;
     boolean includePrice = false;
-    Location mLastLocation;
+    ArrayList<Destination> destinations = new ArrayList<>();
 //    Handler handler = new Handler();
 //    SharedPreferences sharedPref = getSharedPreferences("previousDestination", Context.MODE_PRIVATE);
 
@@ -77,7 +77,14 @@ public class MainActivity extends FragmentActivity {
                     public void onSuccess(JSONArray restaurantDetails) {
                         Log.i("Location", "onSuccess2: Latitude is " + userLocation.getLatitude());
                         try {
-                            ArrayList<Destination> destinations = getDestinationList(restaurantDetails, userLocation.getLatitude(), userLocation.getLongitude());
+//                            ArrayList<Destination> destinations = getDestinationList(restaurantDetails, userLocation.getLatitude(), userLocation.getLongitude());
+
+                            for (int i = 0; i < restaurantDetails.length(); i++) {
+                                getDestination(restaurantDetails, i, userLocation.getLatitude(), userLocation.getLongitude());
+                            }
+                            for (Destination d: destinations) {
+                                Log.i("onCreate", "onSuccess: " + d.getName());
+                            }
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
@@ -86,6 +93,37 @@ public class MainActivity extends FragmentActivity {
 
             }
         }); // get user location then callGoogleMapsAPI()
+    }
+
+    private void getDestination(final JSONArray restaurantDetails, final int i,double mLatitude, double mLongitude) throws JSONException {
+        final String name = restaurantDetails.getJSONObject(i).getString("name");
+        final String placeId = restaurantDetails.getJSONObject(i).getString("place_id");
+        final String address = restaurantDetails.getJSONObject(i).getString("vicinity");
+        callGoogleDistanceMatrixAPI(placeId, mLatitude, mLongitude, new DistanceMatrixVolleyCallback() {
+            @Override
+            public void onSuccess(String result) {
+                Log.d("realrealDistance", "onSuccess: " + result);
+                double distance = Double.parseDouble(result);
+                Destination d = new Destination(name, address, placeId);
+                d.setDistance(distance);
+                try {
+                    if (restaurantDetails.getJSONObject(i).has("price_level")) {
+                        includePrice = true;
+                        String price_level = restaurantDetails.getJSONObject(i).getString("price_level");
+                        int price = Integer.parseInt(price_level);
+                        d.setPrice(price);
+                    }
+                    if (restaurantDetails.getJSONObject(i).has("rating")) {
+                        String r = restaurantDetails.getJSONObject(i).getString("rating");
+                        double rating = Double.parseDouble(r);
+                        d.setRating(rating);
+                    }
+                    destinations.add(d);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
     }
 
     // get user's location and call Google Maps API
@@ -142,28 +180,28 @@ public class MainActivity extends FragmentActivity {
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
-                        if (!includePrice) {
-                            Toast.makeText(getApplicationContext(), "All nearby restaurants do not have price", Toast.LENGTH_SHORT).show();
-                        }
-                        // create two array lists to separate all the restaurants retrieved from the API
-                        ArrayList<Destination> matchUserReqList = new ArrayList<>();
-                        ArrayList<Destination> suggestions = new ArrayList<>();
-
-                        for (Destination d: destinationList) {
-                            if (matchUserReq(d, includePrice)) { // if it matches user requirement
-                                matchUserReqList.add(d); // add into this list
-                            } else { // if not
-                                suggestions.add(d); // add into this list
-                            }
-                        }
-
-                        // create a new intent to switch to the next activity called: "Show result"
-                        Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
-                        // pass both array list to the next activity
-                        showResultActivity.putExtra("matchUserReqList", matchUserReqList);
-                        showResultActivity.putExtra("suggestions", suggestions);
-                        // start the next activity
-                        startActivity(showResultActivity);
+//                        if (!includePrice) {
+//                            Toast.makeText(getApplicationContext(), "All nearby restaurants do not have price", Toast.LENGTH_SHORT).show();
+//                        }
+//                        // create two array lists to separate all the restaurants retrieved from the API
+//                        ArrayList<Destination> matchUserReqList = new ArrayList<>();
+//                        ArrayList<Destination> suggestions = new ArrayList<>();
+//
+//                        for (Destination d: destinationList) {
+//                            if (matchUserReq(d, includePrice)) { // if it matches user requirement
+//                                matchUserReqList.add(d); // add into this list
+//                            } else { // if not
+//                                suggestions.add(d); // add into this list
+//                            }
+//                        }
+//
+//                        // create a new intent to switch to the next activity called: "Show result"
+//                        Intent showResultActivity =  new Intent(MainActivity.this, ShowResult.class);
+//                        // pass both array list to the next activity
+//                        showResultActivity.putExtra("matchUserReqList", matchUserReqList);
+//                        showResultActivity.putExtra("suggestions", suggestions);
+//                        // start the next activity
+//                        startActivity(showResultActivity);
                     }
                 }, new Response.ErrorListener() {
             @Override
@@ -183,7 +221,18 @@ public class MainActivity extends FragmentActivity {
             @Override
             public void onResponse(String response) {
                 Log.d("API", "onResponse: call back success");
-                callback.onSuccess(response);
+                Log.d("InsideDistance", "onSuccess: " + response);
+                JSONObject obj = null;
+                try {
+                    obj = new JSONObject(response);
+                    String realDistance = obj.getJSONArray("rows").getJSONObject(0)
+                            .getJSONArray("elements").getJSONObject(0)
+                            .getJSONObject("distance").getString("value");
+                    Log.d("realDistance", "onSuccess: " + realDistance);
+                    callback.onSuccess(realDistance);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
             }
         }, new Response.ErrorListener() {
             @Override
@@ -195,56 +244,65 @@ public class MainActivity extends FragmentActivity {
 
     }
 
-    private ArrayList<Destination> getDestinationList(JSONArray results, double mLatitude, double mLongitude) throws JSONException {
-        ArrayList<Destination> destinationList = new ArrayList<>();
 
-        for (int i = 0; i < results.length(); i++) {
-//            String latitude = results.getJSONObject(i).getJSONObject("geometry")
-//                    .getJSONObject("location").getString("lat");
-//            String longitude = results.getJSONObject(i).getJSONObject("geometry")
-//                    .getJSONObject("location").getString("lng");
-            final String name = results.getJSONObject(i).getString("name");
-            final String placeId = results.getJSONObject(i).getString("place_id");
-            final String address = results.getJSONObject(i).getString("vicinity");
-            int price = 0;
-            if (results.getJSONObject(i).has("price_level")) {
-                includePrice = true;
-                String price_level = results.getJSONObject(i).getString("price_level");
-                price = Integer.parseInt(price_level);
-            }
-            double rating = 0;
-            if (results.getJSONObject(i).has("rating")) {
-                String r = results.getJSONObject(i).getString("rating");
-                rating = Double.parseDouble(r);
-            }
-            final Destination[] d = new Destination[1];
-            callGoogleDistanceMatrixAPI(placeId, mLatitude, mLongitude, new DistanceMatrixVolleyCallback() {
-                @Override
-                public String onSuccess(String distanceResults) {
-                    String realDistance = "";
-                    try {
-//                        Log.d("Restaurants", "onSuccess: first restaurant: " + destinations.get(0).getName());
-                        Log.d("InsideDistance", "onSuccess: " + distanceResults);
-                        JSONObject obj = new JSONObject(distanceResults);
-                        realDistance = obj.getJSONArray("rows").getJSONObject(0)
-                                .getJSONArray("elements").getJSONObject(0)
-                                .getJSONObject("distance").getString("value");
-                        Log.d("realDistance", "onSuccess: " + realDistance);
-                        d[0] = new Destination(name, address, placeId, Double.parseDouble(realDistance));
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                    return realDistance;
-                }
-            });
-//            Destination d = new Destination(name, address, placeId, 0);
-            d[0].setPrice(price);
-            d[0].setRating(rating);
-            destinationList.add(d[0]);
-        }
-        return destinationList;
-    }
 
+//    private ArrayList<Destination> getDestinationList(JSONArray results, double mLatitude, double mLongitude) throws JSONException {
+//        ArrayList<Destination> destinationList = new ArrayList<>();
+//
+//        for (int i = 0; i < results.length(); i++) {
+////            String latitude = results.getJSONObject(i).getJSONObject("geometry")
+////                    .getJSONObject("location").getString("lat");
+////            String longitude = results.getJSONObject(i).getJSONObject("geometry")
+////                    .getJSONObject("location").getString("lng");
+//            String name = results.getJSONObject(i).getString("name");
+//            String placeId = results.getJSONObject(i).getString("place_id");
+//            String address = results.getJSONObject(i).getString("vicinity");
+//
+////            Testing testing = new Testing();
+//            callGoogleDistanceMatrixAPI(placeId, mLatitude, mLongitude, new DistanceMatrixVolleyCallback() {
+//                @Override
+//                public void onSuccess(String result) {
+//                    Log.d("realrealDistance", "onSuccess: " + result);
+//                    distance = Double.parseDouble(result);
+//                }
+//            });
+////            Log.d("realDistance", "getDestinationList: " + distance);
+////            Log.d("realDistance", "getDestinationList: distance: " + testing.distance);
+//
+////            callGoogleDistanceMatrixAPI(placeId, mLatitude, mLongitude, new DistanceMatrixVolleyCallback() {
+////                @Override
+////                public String onSuccess(String distanceResults) {
+////                    String realDistance = "";
+////                    try {
+//////                        Log.d("Restaurants", "onSuccess: first restaurant: " + destinations.get(0).getName());
+////                        Log.d("InsideDistance", "onSuccess: " + distanceResults);
+////                        JSONObject obj = new JSONObject(distanceResults);
+////                        realDistance = obj.getJSONArray("rows").getJSONObject(0)
+////                                .getJSONArray("elements").getJSONObject(0)
+////                                .getJSONObject("distance").getString("value");
+////                        Log.d("realDistance", "onSuccess: " + realDistance);
+////                    } catch (JSONException e) {
+////                        e.printStackTrace();
+////                    }
+////                    return realDistance;
+////                }
+////            });
+//            Destination d = new Destination(name, address, placeId);
+//            if (results.getJSONObject(i).has("price_level")) {
+//                includePrice = true;
+//                String price_level = results.getJSONObject(i).getString("price_level");
+//                int price = Integer.parseInt(price_level);
+//                d.setPrice(price);
+//            }
+//            if (results.getJSONObject(i).has("rating")) {
+//                String r = results.getJSONObject(i).getString("rating");
+//                double rating = Double.parseDouble(r);
+//                d.setRating(rating);
+//            }
+//            destinationList.add(d);
+//        }
+//        return destinationList;
+//    }
 
 
     /* check if the destination matches the user's criteria

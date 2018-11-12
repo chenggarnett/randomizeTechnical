@@ -16,11 +16,11 @@ public class Destination implements Serializable, Comparable<Destination> {
     private String telNo;
     private String website;
 
-    public Destination(String n, String a , String i, double d) {
+    public Destination(String n, String a , String i) {
         name = n;
         address = a;
         id = i;
-        distance = d;
+        distance = 0;
         rating = 0;
         price = 0;
         telNo = "";

@@ -179,7 +179,7 @@ public class ShowResult extends AppCompatActivity {
         debugPrint(suggestions, showDistance, showPrice, showRating, showTelNo, showWebsite); // debug purpose
     }
 
-    private void debugPrint(ArrayList<Destination> destinationList,
+    public static void debugPrint(ArrayList<Destination> destinationList,
                             boolean showDistance, boolean showPrice, boolean showRating, boolean showTelNo, boolean showWebsite) {
         for (int i = 0; i < destinationList.size(); i++) { // debug purpose
             Log.i("debugPrint",i+1 + ". " + "Name: " + destinationList.get(i).getName());
